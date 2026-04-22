@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: vitalguard-backend
+    env: python
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      - key: MONGO_URI
+        sync: false
+      - key: DEV_MODE
+        value: false
+      - key: DB_NAME
+        value: "vitalguard"

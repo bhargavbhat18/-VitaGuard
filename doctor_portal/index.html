@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>VitalGuard — Doctor Portal</title>
+<meta name="description" content="VitalGuard Doctor Portal — Clinical oversight, patient monitoring, prescriptions, triage, and telehealth."/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bg-primary:#f8f9fb;--bg-secondary:#ffffff;--bg-card:#ffffff;
+  --border-color:#e2e8f0;--text-primary:#0f172a;--text-secondary:#475569;--text-muted:#94a3b8;
+  --accent:#6366f1;--accent-dark:#4f46e5;--accent-light:rgba(99,102,241,0.08);
+  --accent-red:#ef4444;--accent-green:#22c55e;--accent-amber:#f59e0b;--accent-blue:#3b82f6;
+  --gradient-accent:linear-gradient(135deg,#4f46e5,#6366f1);
+  --gradient-red:linear-gradient(135deg,#B6171E,#ef4444);
+  --gradient-green:linear-gradient(135deg,#16a34a,#22c55e);
+  --sidebar-width:72px;--header-height:64px;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
+body{background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden;}
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.12);border-radius:10px;}
+
+/* ─── Sidebar ─── */
+.sidebar{position:fixed;top:0;left:0;width:var(--sidebar-width);height:100vh;background:#fff;border-right:1px solid var(--border-color);display:flex;flex-direction:column;align-items:center;padding:16px 0;z-index:200;}
+.sidebar-logo{width:42px;height:42px;background:var(--gradient-accent);border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:28px;box-shadow:0 4px 20px rgba(99,102,241,0.35);cursor:pointer;transition:transform .3s,box-shadow .3s;}
+.sidebar-logo:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(99,102,241,0.5);}
+.sidebar-nav{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;}
+.nav-btn{width:44px;height:44px;border-radius:14px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .25s;position:relative;}
+.nav-btn:hover{background:rgba(0,0,0,0.05);color:var(--text-primary);}
+.nav-btn.active{background:var(--accent-light);color:var(--accent);}
+.nav-btn.active::before{content:'';position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:20px;background:var(--gradient-accent);border-radius:0 3px 3px 0;}
+.nav-btn svg{width:20px;height:20px;}
+.nav-btn .tip{position:absolute;left:56px;background:#0f172a;color:#f1f5f9;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;transform:translateX(-4px);box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:300;}
+.nav-btn:hover .tip{opacity:1;transform:translateX(0);}
+
+/* ─── Header ─── */
+.top-header{position:fixed;top:0;left:var(--sidebar-width);right:0;height:var(--header-height);background:rgba(255,255,255,0.88);backdrop-filter:blur(20px);border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;padding:0 28px;z-index:150;}
+.header-title h1{font-size:18px;font-weight:800;background:linear-gradient(135deg,#0f172a,#334155);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.header-title .subtitle{font-size:12px;color:var(--text-muted);font-weight:500;}
+.header-right{display:flex;align-items:center;gap:14px;}
+.status-badge{display:flex;align-items:center;gap:8px;padding:6px 16px;border-radius:24px;font-size:12px;font-weight:700;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.18);color:var(--accent-green);}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--accent-green);animation:pd 1.5s ease-in-out infinite;}
+@keyframes pd{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,197,94,0.4);}50%{opacity:.6;box-shadow:0 0 0 6px rgba(34,197,94,0);}}
+.clock{font-size:13px;color:var(--text-secondary);font-weight:500;font-variant-numeric:tabular-nums;}
+.header-btn{width:38px;height:38px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.header-btn:hover{background:rgba(0,0,0,0.04);color:var(--text-primary);}
+.header-btn svg{width:18px;height:18px;}
+
+/* ─── Main ─── */
+.main-content{margin-left:var(--sidebar-width);margin-top:var(--header-height);padding:24px;min-height:calc(100vh - var(--header-height));}
+.page-view{display:none;}.page-view.active{display:block;}
+.page-header-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;}
+.page-title{font-size:20px;font-weight:800;}
+
+/* ─── Shared Components ─── */
+.panel{background:#fff;border:1px solid var(--border-color);border-radius:16px;overflow:hidden;transition:border-color .3s;}
+.panel:hover{border-color:#cbd5e1;}
+.panel-header{padding:16px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;}
+.panel-title{font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.panel-title .dot{width:6px;height:6px;border-radius:50%;display:inline-block;}
+
+.badge{font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;display:inline-block;text-transform:uppercase;letter-spacing:.5px;}
+.badge.critical{background:rgba(239,68,68,0.1);color:var(--accent-red);}
+.badge.elevated{background:rgba(245,158,11,0.1);color:var(--accent-amber);}
+.badge.stable{background:rgba(34,197,94,0.1);color:var(--accent-green);}
+.badge.reviewed{background:rgba(99,102,241,0.1);color:var(--accent);}
+.badge.followup{background:rgba(245,158,11,0.1);color:var(--accent-amber);}
+.badge.dispatched{background:rgba(239,68,68,0.1);color:var(--accent-red);}
+.badge.sent{background:rgba(59,130,246,0.1);color:var(--accent-blue);}
+.badge.completed{background:rgba(34,197,94,0.1);color:var(--accent-green);}
+.badge.pending{background:rgba(148,163,184,0.15);color:var(--text-muted);}
+
+.btn{padding:8px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .2s;display:inline-flex;align-items:center;gap:5px;}
+.btn-accent{background:var(--gradient-accent);color:#fff;}
+.btn-accent:hover{box-shadow:0 4px 16px rgba(99,102,241,0.3);transform:translateY(-1px);}
+.btn-outline{background:#fff;border:1px solid var(--border-color);color:var(--text-secondary);}
+.btn-outline:hover{background:#f8fafc;color:var(--text-primary);}
+.btn-red{background:rgba(239,68,68,0.1);color:var(--accent-red);}
+.btn-red:hover{background:rgba(239,68,68,0.15);}
+.btn-green{background:rgba(34,197,94,0.1);color:var(--accent-green);}
+.btn-green:hover{background:rgba(34,197,94,0.15);}
+
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+.stat-card{background:#fff;border:1px solid var(--border-color);border-radius:16px;padding:20px;position:relative;overflow:hidden;transition:all .3s;}
+.stat-card:hover{border-color:#cbd5e1;transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,0.06);}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.stat-card.indigo::before{background:var(--gradient-accent);}
+.stat-card.red::before{background:linear-gradient(135deg,#B6171E,#ef4444);}
+.stat-card.green::before{background:var(--gradient-green);}
+.stat-card.amber::before{background:linear-gradient(135deg,#d97706,#f59e0b);}
+.sc-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:12px;}
+.stat-card.indigo .sc-icon{background:var(--accent-light);}
+.stat-card.red .sc-icon{background:rgba(239,68,68,0.1);}
+.stat-card.green .sc-icon{background:rgba(34,197,94,0.1);}
+.stat-card.amber .sc-icon{background:rgba(245,158,11,0.1);}
+.sc-label{font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:4px;}
+.sc-val{font-size:28px;font-weight:900;line-height:1;}
+.stat-card.indigo .sc-val{color:var(--accent);}
+.stat-card.red .sc-val{color:var(--accent-red);}
+.stat-card.green .sc-val{color:var(--accent-green);}
+.stat-card.amber .sc-val{color:var(--accent-amber);}
+
+/* ─── Data Table ─── */
+.d-table{width:100%;border-collapse:separate;border-spacing:0;}
+.d-table thead th{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;padding:12px 14px;text-align:left;border-bottom:1px solid var(--border-color);}
+.d-table tbody tr{transition:background .15s;cursor:pointer;}
+.d-table tbody tr:hover{background:#f8fafc;}
+.d-table tbody td{padding:12px 14px;font-size:12px;font-weight:500;color:var(--text-secondary);border-bottom:1px solid var(--border-color);}
+.d-table tbody td:first-child{font-weight:700;color:var(--text-primary);}
+
+.search-box{display:flex;align-items:center;gap:8px;background:#f8fafc;border:1px solid var(--border-color);border-radius:10px;padding:8px 14px;width:280px;transition:border-color .2s;}
+.search-box:focus-within{border-color:rgba(99,102,241,0.4);}
+.search-box svg{width:16px;height:16px;color:var(--text-muted);flex-shrink:0;}
+.search-box input{border:none;background:transparent;font-size:12px;font-weight:500;color:var(--text-primary);outline:none;width:100%;}
+
+/* ─── Chart ─── */
+.chart-box{position:relative;width:100%;height:280px;}
+.chart-box canvas{width:100%;height:100%;}
+.time-tabs{display:flex;gap:4px;}
+.time-tab{padding:5px 12px;border-radius:8px;font-size:11px;font-weight:700;border:1px solid var(--border-color);background:#fff;color:var(--text-muted);cursor:pointer;transition:all .2s;}
+.time-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* ─── AI Summary ─── */
+.ai-card{background:linear-gradient(135deg,#eef2ff,#faf5ff);border:1px solid #e0e7ff;border-radius:14px;padding:20px;margin-bottom:20px;}
+.ai-card .ai-title{font-size:13px;font-weight:800;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.ai-card .ai-text{font-size:12px;line-height:1.7;color:var(--text-secondary);}
+.ai-card .ai-text strong{color:var(--text-primary);}
+
+/* ─── Rx Card ─── */
+.rx-card{background:#fff;border:1px solid var(--border-color);border-radius:12px;padding:16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;}
+.rx-info{flex:1;}
+.rx-name{font-size:13px;font-weight:800;}
+.rx-detail{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.rx-adherence{text-align:right;}
+
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-group label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;}
+.form-group input,.form-group select{padding:9px 12px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;font-weight:500;background:#f8fafc;color:var(--text-primary);outline:none;transition:border-color .2s;}
+.form-group input:focus,.form-group select:focus{border-color:rgba(99,102,241,0.4);}
+
+/* ─── Triage ─── */
+.triage-item{padding:14px 20px;border-bottom:1px solid var(--border-color);display:flex;align-items:flex-start;gap:12px;transition:background .15s;}
+.triage-item:hover{background:#fafafa;}
+.triage-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.triage-actions{display:flex;gap:6px;margin-top:6px;}
+.triage-btn{padding:4px 10px;border-radius:7px;font-size:10px;font-weight:700;border:1px solid var(--border-color);background:#fff;cursor:pointer;transition:all .2s;}
+.triage-btn:hover{transform:translateY(-1px);}
+.triage-btn.reviewed{color:var(--accent);border-color:rgba(99,102,241,0.3);}
+.triage-btn.reviewed:hover{background:var(--accent-light);}
+.triage-btn.followup{color:var(--accent-amber);border-color:rgba(245,158,11,0.3);}
+.triage-btn.followup:hover{background:rgba(245,158,11,0.08);}
+.triage-btn.dispatch{color:var(--accent-red);border-color:rgba(239,68,68,0.3);}
+.triage-btn.dispatch:hover{background:rgba(239,68,68,0.08);}
+
+/* ─── Telehealth ─── */
+.consult-card{background:#fff;border:1px solid var(--border-color);border-radius:14px;padding:18px;margin-bottom:12px;display:flex;align-items:center;gap:16px;transition:all .2s;}
+.consult-card:hover{border-color:#cbd5e1;box-shadow:0 4px 16px rgba(0,0,0,0.04);}
+.consult-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;}
+.consult-info{flex:1;}
+.consult-name{font-size:13px;font-weight:800;}
+.consult-meta{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.consult-actions{display:flex;gap:8px;}
+
+/* ─── Referral ─── */
+.referral-card{background:#fff;border:1px solid var(--border-color);border-radius:14px;padding:18px;margin-bottom:12px;}
+.ref-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.ref-patient{font-size:14px;font-weight:800;}
+.ref-detail{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.ref-specialist{font-size:12px;font-weight:600;color:var(--accent);margin-top:4px;}
+
+/* ─── Modal ─── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);backdrop-filter:blur(8px);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal-box{background:#fff;border:1px solid var(--border-color);border-radius:20px;padding:32px;width:480px;max-width:90vw;transform:scale(0.95) translateY(10px);transition:transform .25s;box-shadow:0 24px 64px rgba(0,0,0,0.12);}
+.modal-overlay.open .modal-box{transform:scale(1) translateY(0);}
+.modal-title{font-size:18px;font-weight:800;margin-bottom:6px;}
+.modal-subtitle{font-size:13px;color:var(--text-muted);margin-bottom:20px;}
+.modal-actions{display:flex;gap:10px;margin-top:20px;}
+.modal-btn{flex:1;padding:11px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .2s;}
+.modal-btn.cancel{background:#f1f5f9;color:var(--text-secondary);}
+.modal-btn.cancel:hover{background:#e2e8f0;}
+.modal-btn.primary{background:var(--gradient-accent);color:#fff;}
+.modal-btn.primary:hover{box-shadow:0 4px 16px rgba(99,102,241,0.3);}
+
+/* ─── Animations ─── */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.fade-in{animation:fadeIn .4s ease forwards;}
+
+/* ─── Telehealth & Chat ─── */
+.tele-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); z-index:1000; display:none; flex-direction:column; align-items:center; justify-content:center; }
+.tele-overlay.active { display:flex; }
+.video-container { position:relative; width:900px; height:600px; background:#1e293b; border-radius:24px; overflow:hidden; box-shadow:0 32px 64px rgba(0,0,0,0.4); display:grid; grid-template-columns:1fr 320px; }
+.video-main { position:relative; background:#000; display:flex; align-items:center; justify-content:center; }
+.remote-video { width:100%; height:100%; object-fit:cover; }
+.local-video { position:absolute; bottom:20px; right:20px; width:200px; height:150px; background:#334155; border-radius:12px; border:2px solid rgba(255,255,255,0.2); object-fit:cover; z-index:10; }
+.video-controls { position:absolute; bottom:30px; left:50%; transform:translateX(-50%); display:flex; gap:16px; z-index:20; }
+.v-btn { width:52px; height:52px; border-radius:50%; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all .2s; color:#fff; font-size:20px; }
+.v-btn.mute { background:rgba(255,255,255,0.15); backdrop-filter:blur(10px); }
+.v-btn.mute.off { background:var(--accent-red); }
+.v-btn.cam { background:rgba(255,255,255,0.15); backdrop-filter:blur(10px); }
+.v-btn.cam.off { background:var(--accent-red); }
+.v-btn.end { background:#ef4444; width:64px; border-radius:32px; font-size:24px; }
+.v-btn:hover { transform:scale(1.1); }
+
+.chat-side { background:#fff; display:flex; flex-direction:column; border-left:1px solid var(--border-color); }
+.chat-header { padding:16px 20px; border-bottom:1px solid var(--border-color); font-weight:800; font-size:14px; display:flex; align-items:center; justify-content:space-between; }
+.chat-messages { flex:1; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; background:#f8fafc; }
+.msg { max-width:85%; padding:10px 14px; border-radius:14px; font-size:12px; line-height:1.5; position:relative; }
+.msg.doctor { background:var(--accent); color:#fff; align-self:flex-end; border-bottom-right-radius:2px; }
+.msg.patient { background:#e2e8f0; color:var(--text-primary); align-self:flex-start; border-bottom-left-radius:2px; }
+.msg-time { font-size:9px; opacity:0.7; margin-top:4px; text-align:right; }
+.chat-input-area { padding:16px; border-top:1px solid var(--border-color); display:flex; gap:8px; }
+.chat-input { flex:1; border:1px solid var(--border-color); border-radius:10px; padding:10px 14px; font-size:12px; outline:none; transition:border-color .2s; }
+.chat-input:focus { border-color:var(--accent); }
+
+@media(max-width:1200px){.stats-row{grid-template-columns:repeat(2,1fr);}.form-row{grid-template-columns:1fr;}}
+@media(max-width:768px){.sidebar{display:none;}.main-content{margin-left:0;}.top-header{left:0;}.stats-row{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<!-- ═══ Sidebar ═══ -->
+<nav class="sidebar">
+  <div class="sidebar-logo" title="VitalGuard Doctor Portal">
+    <svg width="22" height="22" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+  </div>
+  <div class="sidebar-nav">
+    <button class="nav-btn active" id="nav-patients" onclick="go('patients')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      <span class="tip">Patients</span>
+    </button>
+    <button class="nav-btn" id="nav-clinical" onclick="go('clinical')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span class="tip">Clinical Deep-Dive</span>
+    </button>
+    <button class="nav-btn" id="nav-rx" onclick="go('rx')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><path d="M13 8h4"/><path d="M13 12h4"/><path d="M13 16h4"/></svg>
+      <span class="tip">Prescriptions</span>
+    </button>
+    <button class="nav-btn" id="nav-triage" onclick="go('triage')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <span class="tip">Alert Triage</span>
+    </button>
+    <button class="nav-btn" id="nav-telehealth" onclick="go('telehealth')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+      <span class="tip">Telehealth</span>
+    </button>
+    <button class="nav-btn" id="nav-referrals" onclick="go('referrals')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      <span class="tip">Referrals</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ═══ Header ═══ -->
+<header class="top-header">
+  <div class="header-title">
+    <div><h1>Doctor Command Center</h1><div class="subtitle">Clinical oversight & patient management</div></div>
+  </div>
+  <div class="header-right">
+    <div class="status-badge"><div class="status-dot"></div><span id="conn-lbl">Live</span></div>
+    <span class="clock" id="clock"></span>
+    <button class="header-btn" onclick="go('triage')" title="Alerts" style="position:relative">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <span id="alert-badge" style="position:absolute;top:4px;right:4px;min-width:16px;height:16px;background:var(--accent-red);color:#fff;border-radius:8px;font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff">0</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══ Main ═══ -->
+<main class="main-content">
+
+<!-- ──── PAGE 1: Patient Directory ──── -->
+<section class="page-view active" id="page-patients">
+  <div class="page-header-bar">
+    <div class="page-title">👥 Patient Directory</div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="search-box">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="patient-search" type="text" placeholder="Search patients..." oninput="filterPatients()"/>
+      </div>
+      <button class="btn btn-accent" onclick="openModal('add-patient')">+ Add Patient</button>
+    </div>
+  </div>
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card indigo"><div class="sc-icon">👥</div><div class="sc-label">Total Patients</div><div class="sc-val" id="s-total">0</div></div>
+    <div class="stat-card red"><div class="sc-icon">🚨</div><div class="sc-label">Critical</div><div class="sc-val" id="s-crit">0</div></div>
+    <div class="stat-card amber"><div class="sc-icon">⚠️</div><div class="sc-label">Elevated</div><div class="sc-val" id="s-elev">0</div></div>
+    <div class="stat-card green"><div class="sc-icon">✅</div><div class="sc-label">Stable</div><div class="sc-val" id="s-stable">0</div></div>
+  </div>
+  <div class="panel">
+    <table class="d-table" id="patient-table">
+      <thead><tr><th>Patient</th><th>ID</th><th>Age</th><th>Condition</th><th>Risk Level</th><th>Last Vitals</th><th>Actions</th></tr></thead>
+      <tbody id="patient-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ──── PAGE 2: Clinical Deep-Dive ──── -->
+<section class="page-view" id="page-clinical">
+  <div class="page-header-bar">
+    <div class="page-title">📊 Clinical Deep-Dive</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:12px;color:var(--text-muted);font-weight:600">Patient:</span>
+      <select id="clin-patient" onchange="loadClinical()" style="padding:6px 12px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;font-weight:600;background:#f8fafc;color:var(--text-primary);outline:none;cursor:pointer"></select>
+    </div>
+  </div>
+
+  <div class="ai-card" id="ai-summary">
+    <div class="ai-title">🤖 AI Clinical Summary</div>
+    <div class="ai-text" id="ai-text">Select a patient to generate an AI-powered clinical summary...</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px" id="clin-vitals"></div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot" style="background:var(--accent)"></span> Vitals Trend</div>
+      <div class="time-tabs">
+        <button class="time-tab active" onclick="setRange(this,20)">7 Days</button>
+        <button class="time-tab" onclick="setRange(this,50)">30 Days</button>
+        <button class="time-tab" onclick="setRange(this,100)">6 Months</button>
+      </div>
+    </div>
+    <div style="padding:16px"><div class="chart-box"><canvas id="clinChart"></canvas></div></div>
+  </div>
+</section>
+
+<!-- ──── PAGE 3: Prescriptions ──── -->
+<section class="page-view" id="page-rx">
+  <div class="page-header-bar">
+    <div class="page-title">💊 Prescription Management</div>
+    <button class="btn btn-accent" onclick="openModal('new-rx')">+ New Prescription</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><span class="dot" style="background:var(--accent)"></span> Digital RX Pad</div>
+        </div>
+        <div style="padding:20px">
+          <div class="form-row">
+            <div class="form-group"><label>Patient</label><select id="rx-patient" style="padding:9px 12px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;background:#f8fafc;color:var(--text-primary);outline:none"></select></div>
+            <div class="form-group"><label>Medication Name</label><input id="rx-med" placeholder="e.g., Metformin 500mg"/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Dosage</label><input id="rx-dose" placeholder="e.g., 1 tablet"/></div>
+            <div class="form-group"><label>Frequency</label><select id="rx-freq"><option>Once daily</option><option>Twice daily</option><option>Thrice daily</option><option>As needed</option><option>Weekly</option></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Duration</label><input id="rx-dur" placeholder="e.g., 30 days"/></div>
+            <div class="form-group"><label>Notes</label><input id="rx-notes" placeholder="Special instructions"/></div>
+          </div>
+          <button class="btn btn-accent" onclick="addPrescription()" style="width:100%;justify-content:center;padding:11px">Prescribe Medication</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><span class="dot" style="background:var(--accent-green)"></span> Active Prescriptions</div>
+        </div>
+        <div style="padding:16px" id="rx-list"></div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <div class="panel-header">
+          <div class="panel-title"><span class="dot" style="background:var(--accent-amber)"></span> Adherence Alerts</div>
+        </div>
+        <div style="padding:16px" id="adherence-alerts"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ──── PAGE 4: Alert Triage ──── -->
+<section class="page-view" id="page-triage">
+  <div class="page-header-bar">
+    <div class="page-title">🔔 Alert Log & Triage</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" onclick="filterTriage('all')">All</button>
+      <button class="btn btn-outline" onclick="filterTriage('pending')">Pending</button>
+      <button class="btn btn-outline" onclick="filterTriage('reviewed')">Reviewed</button>
+      <button class="btn btn-outline" onclick="filterTriage('followup')">Follow-up</button>
+      <button class="btn btn-accent" onclick="fetchTriage()">↻ Refresh</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div id="triage-list" style="max-height:75vh;overflow-y:auto">
+      <div style="text-align:center;color:var(--text-muted);padding:48px;font-size:13px">Loading alerts...</div>
+    </div>
+  </div>
+</section>
+
+<!-- ──── PAGE 5: Telehealth ──── -->
+<section class="page-view" id="page-telehealth">
+  <div class="page-header-bar">
+    <div class="page-title">📹 Telehealth Consultations</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div>
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title"><span class="dot" style="background:var(--accent-green)"></span> Consultation Queue</div></div>
+        <div style="padding:16px" id="consult-queue"></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title"><span class="dot" style="background:var(--accent)"></span> Recent Consultations</div></div>
+        <div style="padding:16px" id="consult-history"></div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <div class="panel-header"><div class="panel-title"><span class="dot" style="background:var(--accent-amber)"></span> Quick Notes</div></div>
+        <div style="padding:16px">
+          <textarea id="consult-notes" rows="5" placeholder="Document observations and consultation notes here..." style="width:100%;padding:12px;border:1px solid var(--border-color);border-radius:10px;font-size:12px;font-family:Inter;resize:vertical;outline:none;background:#f8fafc;color:var(--text-primary)"></textarea>
+          <button class="btn btn-accent" onclick="saveNotes()" style="margin-top:10px">💾 Save Notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ──── PAGE 6: Referrals ──── -->
+<section class="page-view" id="page-referrals">
+  <div class="page-header-bar">
+    <div class="page-title">📤 Referral Module</div>
+    <button class="btn btn-accent" onclick="openModal('new-referral')">+ New Referral</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div>
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title"><span class="dot" style="background:var(--accent-blue)"></span> Active Referrals</div></div>
+        <div style="padding:16px" id="referral-active"></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title"><span class="dot" style="background:var(--accent-green)"></span> Completed Referrals</div></div>
+        <div style="padding:16px" id="referral-done"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Telehealth Overlay ═══ -->
+<div class="tele-overlay" id="tele-overlay">
+  <div class="video-container">
+    <div class="video-main">
+      <video id="remoteVideo" class="remote-video" autoplay playsinline></video>
+      <video id="localVideo" class="local-video" autoplay playsinline muted></video>
+      <div class="video-controls">
+        <button class="v-btn mute" id="btn-mute" onclick="toggleMute()"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v1a7 7 0 01-14 0v-1M12 18.5V23"/></svg></button>
+        <button class="v-btn cam" id="btn-cam" onclick="toggleCam()"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></button>
+        <button class="v-btn end" onclick="endCall()"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M10.68 13.31a16 16 0 005.14 5.14c.26.16.59.13.82-.08l2.27-2.27c.23-.23.59-.26.85-.1a11 11 0 013.04 1.83.5.5 0 01.07.69l-1.92 1.92c-.2.2-.47.33-.76.36-4.01.4-8.87-1.12-11.83-4.08-2.96-2.96-4.48-7.82-4.08-11.83.03-.29.16-.56.36-.76l1.92-1.92a.5.5 0 01.69.07 11 11 0 011.83 3.04c.16.26.13.59-.08.82L6.1 7.18c-.21.23-.24.56-.08.82a16 16 0 005.14 5.14l-.48.17z"/></svg></button>
+      </div>
+      <div style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,0.5);color:#fff;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;backdrop-filter:blur(10px)" id="call-patient-name">Patient Name</div>
+    </div>
+    <div class="chat-side">
+      <div class="chat-header">Telehealth Chat <button class="btn-outline" style="padding:4px;border-radius:6px" onclick="document.getElementById('tele-overlay').classList.remove('active')">✕</button></div>
+      <div class="chat-messages" id="chat-msgs"></div>
+      <div class="chat-input-area">
+        <input type="text" class="chat-input" id="chat-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter')sendMsg()"/>
+        <button class="btn btn-accent" style="padding:10px" onclick="sendMsg()"><svg width="18" height="18" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Modal ═══ -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title" id="modal-title">Title</div>
+    <div class="modal-subtitle" id="modal-subtitle">Subtitle</div>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn primary" id="modal-submit" onclick="submitModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API='http://localhost:8000';
+
+// Clock
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})},1000);
+
+// ═══ NAVIGATION ═══
+let curPage='patients';
+function go(p){
+  document.querySelectorAll('.page-view').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  const pg=document.getElementById(`page-${p}`);
+  if(pg){pg.classList.add('active');pg.classList.remove('fade-in');void pg.offsetWidth;pg.classList.add('fade-in');}
+  const btn=document.getElementById(`nav-${p}`);if(btn)btn.classList.add('active');
+  curPage=p;
+  if(p==='clinical')loadClinical();
+  if(p==='triage')fetchTriage();
+}
+
+// ═══ PATIENT DATA ═══
+const patients=[
+  {id:'LKT01',name:'Rajesh Kumar',age:72,condition:'Hypertension + Diabetes',risk:'critical',hr:112,spo2:91,bp:'148/96',glucose:210,temp:37.8,lastSeen:'2 min ago',bg:'#ef4444'},
+  {id:'LKT02',name:'Ananya Reddy',age:34,condition:'Post-Surgery Recovery',risk:'elevated',hr:92,spo2:94,bp:'132/86',glucose:155,temp:37.4,lastSeen:'5 min ago',bg:'#f59e0b'},
+  {id:'LKT03',name:'Vikram Patel',age:58,condition:'Cardiac Arrhythmia',risk:'critical',hr:118,spo2:89,bp:'155/102',glucose:195,temp:38.1,lastSeen:'1 min ago',bg:'#ef4444'},
+  {id:'LKT04',name:'Meera Sharma',age:45,condition:'Thyroid Disorder',risk:'stable',hr:76,spo2:98,bp:'118/76',glucose:105,temp:36.6,lastSeen:'8 min ago',bg:'#22c55e'},
+  {id:'LKT05',name:'Arjun Singh',age:67,condition:'COPD',risk:'elevated',hr:88,spo2:93,bp:'138/88',glucose:140,temp:37.2,lastSeen:'3 min ago',bg:'#f59e0b'},
+  {id:'LKT06',name:'Priya Nair',age:29,condition:'Pregnancy Monitoring',risk:'stable',hr:82,spo2:97,bp:'112/72',glucose:98,temp:36.5,lastSeen:'12 min ago',bg:'#22c55e'},
+  {id:'LKT07',name:'Suresh Iyer',age:61,condition:'Renal Insufficiency',risk:'elevated',hr:94,spo2:93,bp:'142/90',glucose:168,temp:37.1,lastSeen:'4 min ago',bg:'#f59e0b'},
+  {id:'LKT08',name:'Lakshmi Devi',age:78,condition:'Congestive Heart Failure',risk:'critical',hr:106,spo2:90,bp:'160/100',glucose:188,temp:37.6,lastSeen:'1 min ago',bg:'#ef4444'},
+  {id:'LKT09',name:'Naveen Joshi',age:42,condition:'Asthma (Controlled)',risk:'stable',hr:74,spo2:98,bp:'120/78',glucose:102,temp:36.4,lastSeen:'15 min ago',bg:'#22c55e'},
+  {id:'LKT10',name:'Kavitha Rao',age:55,condition:'Type 2 Diabetes',risk:'stable',hr:78,spo2:97,bp:'126/82',glucose:132,temp:36.7,lastSeen:'10 min ago',bg:'#22c55e'},
+];
+
+function renderPatients(list){
+  const tb=document.getElementById('patient-tbody');
+  const sorted=[...list].sort((a,b)=>{const o={critical:0,elevated:1,stable:2};return o[a.risk]-o[b.risk];});
+  tb.innerHTML=sorted.map(p=>`<tr onclick="selectPatient('${p.id}')">
+    <td><div style="display:flex;align-items:center;gap:10px"><div style="width:32px;height:32px;border-radius:50%;background:${p.bg};display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800">${p.name.charAt(0)}</div>${p.name}</div></td>
+    <td style="font-weight:600;color:var(--accent)">${p.id}</td><td>${p.age}</td><td>${p.condition}</td>
+    <td><span class="badge ${p.risk}">${p.risk.toUpperCase()}</span></td>
+    <td style="font-size:11px">${p.lastSeen}</td>
+    <td><button class="btn btn-outline" onclick="event.stopPropagation();selectPatient('${p.id}')" style="font-size:10px;padding:4px 10px">Deep-Dive →</button></td>
+  </tr>`).join('');
+  const cr=list.filter(p=>p.risk==='critical').length;
+  const el=list.filter(p=>p.risk==='elevated').length;
+  const st=list.filter(p=>p.risk==='stable').length;
+  document.getElementById('s-total').textContent=list.length;
+  document.getElementById('s-crit').textContent=cr;
+  document.getElementById('s-elev').textContent=el;
+  document.getElementById('s-stable').textContent=st;
+}
+
+function filterPatients(){
+  const q=document.getElementById('patient-search').value.toLowerCase();
+  renderPatients(patients.filter(p=>p.name.toLowerCase().includes(q)||p.id.toLowerCase().includes(q)||p.condition.toLowerCase().includes(q)));
+}
+
+function selectPatient(id){
+  document.getElementById('clin-patient').value=id;
+  go('clinical');
+}
+
+// ═══ CLINICAL DEEP-DIVE ═══
+let chartLimit=20,chartData=[];
+function populateSelects(){
+  const opts=patients.map(p=>`<option value="${p.id}">${p.name} (${p.id})</option>`).join('');
+  document.getElementById('clin-patient').innerHTML=opts;
+  document.getElementById('rx-patient').innerHTML=opts;
+}
+
+async function loadClinical(){
+  const uid=document.getElementById('clin-patient').value||'LKT01';
+  const p=patients.find(x=>x.id===uid);
+  // Current vitals
+  const clin=document.getElementById('clin-vitals');
+  try{
+    const r=await fetch(`${API}/vitals/latest`,{headers:{'Authorization':`Bearer ${uid}`}});
+    const d=await r.json();
+    const items=[
+      {l:'Heart Rate',v:Math.round(d.heart_rate),u:'bpm',c:d.heart_rate>100?'red':d.heart_rate>90?'amber':'green',t:d.heart_rate>100?'↑':'→'},
+      {l:'SpO2',v:Math.round(d.spO2||d.spo2||98),u:'%',c:(d.spO2||d.spo2)<93?'red':(d.spO2||d.spo2)<95?'amber':'green',t:(d.spO2||d.spo2)<95?'↓':'→'},
+      {l:'Systolic BP',v:Math.round(d.bp_systolic),u:'mmHg',c:d.bp_systolic>140?'red':d.bp_systolic>130?'amber':'green',t:d.bp_systolic>130?'↑':'→'},
+      {l:'Glucose',v:Math.round(d.glucose),u:'mg/dL',c:d.glucose>180?'red':d.glucose>140?'amber':'green',t:d.glucose>140?'↑':'→'},
+      {l:'Temp',v:(d.temperature||36.6).toFixed(1),u:'°C',c:d.temperature>38?'red':d.temperature>37.5?'amber':'green',t:d.temperature>37.5?'↑':'→'},
+    ];
+    const colors={red:'var(--accent-red)',amber:'var(--accent-amber)',green:'var(--accent-green)'};
+    clin.innerHTML=items.map(i=>`<div style="background:#fff;border:1px solid var(--border-color);border-radius:12px;padding:14px;text-align:center">
+      <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px">${i.l}</div>
+      <div style="font-size:26px;font-weight:900;color:${colors[i.c]};margin:6px 0">${i.v}<span style="font-size:14px;font-weight:600;margin-left:2px">${i.t}</span></div>
+      <div style="font-size:11px;color:var(--text-muted)">${i.u}</div>
+    </div>`).join('');
+    generateAISummary(uid,d);
+  }catch(e){
+    if(p) clin.innerHTML=[
+      {l:'Heart Rate',v:p.hr,u:'bpm'},{l:'SpO2',v:p.spo2,u:'%'},{l:'Systolic BP',v:p.bp.split('/')[0],u:'mmHg'},
+      {l:'Glucose',v:p.glucose,u:'mg/dL'},{l:'Temp',v:p.temp,u:'°C'}
+    ].map(i=>`<div style="background:#fff;border:1px solid var(--border-color);border-radius:12px;padding:14px;text-align:center">
+      <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase">${i.l}</div>
+      <div style="font-size:26px;font-weight:900;color:var(--text-primary);margin:6px 0">${i.v}</div>
+      <div style="font-size:11px;color:var(--text-muted)">${i.u}</div></div>`).join('');
+    if(p) generateAISummary(uid,p);
+  }
+  fetchChart();
+}
+
+function generateAISummary(uid,d){
+  const p=patients.find(x=>x.id===uid);
+  const name=p?p.name:uid;
+  const issues=[];
+  const hr=d.heart_rate||d.hr;const spo2=d.spO2||d.spo2;const glu=d.glucose;const temp=d.temperature||d.temp;
+  if(hr>100)issues.push(`<strong>Tachycardia detected</strong> — HR at ${Math.round(hr)} bpm (threshold: 100 bpm). Recommend ECG follow-up.`);
+  if(hr<60)issues.push(`<strong>Bradycardia detected</strong> — HR at ${Math.round(hr)} bpm. Monitor for syncope symptoms.`);
+  if(spo2<93)issues.push(`<strong>Hypoxemia alert</strong> — SpO2 at ${Math.round(spo2)}%. Consider supplemental oxygen and ABG analysis.`);
+  if(glu>180)issues.push(`<strong>Hyperglycemia</strong> — Glucose at ${Math.round(glu)} mg/dL. Review insulin dosage and dietary compliance.`);
+  if(glu>140&&glu<=180)issues.push(`Glucose moderately elevated at ${Math.round(glu)} mg/dL. Monitor trend over 48 hours.`);
+  if(temp>38)issues.push(`<strong>Fever detected</strong> — Temperature at ${temp.toFixed(1)}°C. Rule out infection; order CBC if persistent.`);
+  if(!issues.length)issues.push(`All vitals within normal parameters. Patient is <strong>stable</strong> — continue current care plan.`);
+  const summary=`<strong>${name}</strong> (${uid}) — ${p?p.condition:'Unknown'}<br><br>`+issues.map(i=>`• ${i}`).join('<br>');
+  document.getElementById('ai-text').innerHTML=summary;
+}
+
+async function fetchChart(){
+  const uid=document.getElementById('clin-patient').value||'LKT01';
+  try{
+    const r=await fetch(`${API}/vitals/history?limit=${chartLimit}`,{headers:{'Authorization':`Bearer ${uid}`}});
+    chartData=(await r.json()).reverse();
+  }catch(e){chartData=[];}
+  drawChart();
+}
+
+function setRange(btn,limit){
+  document.querySelectorAll('.time-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); chartLimit=limit; fetchChart();
+}
+
+function drawChart(){
+  const cv=document.getElementById('clinChart');if(!cv||!chartData.length)return;
+  const ctx=cv.getContext('2d');const rect=cv.parentElement.getBoundingClientRect();
+  cv.width=rect.width*2;cv.height=rect.height*2;ctx.scale(2,2);
+  const W=rect.width,H=rect.height;ctx.clearRect(0,0,W,H);
+  const pad={t:24,r:20,b:36,l:48},cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;
+  const hrs=chartData.map(d=>d.heart_rate);
+  const spo2s=chartData.map(d=>d.spO2||d.spo2||98);
+  const glus=chartData.map(d=>d.glucose);
+  const all=[...hrs,...spo2s,...glus];
+  const minV=Math.min(...all)-5,maxV=Math.max(...all)+5;
+
+  // Grid
+  ctx.strokeStyle='#f1f5f9';ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){
+    const y=pad.t+(cH/5)*i;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cW,y);ctx.stroke();
+    ctx.fillStyle='#94a3b8';ctx.font='10px Inter';ctx.textAlign='right';
+    ctx.fillText(Math.round(maxV-((maxV-minV)/5)*i),pad.l-6,y+4);
+  }
+  // X labels
+  ctx.textAlign='center';ctx.fillStyle='#94a3b8';ctx.font='9px Inter';
+  const step=Math.max(1,Math.floor(chartData.length/6));
+  chartData.forEach((d,i)=>{if(i%step===0||i===chartData.length-1){
+    const x=pad.l+(cW/(chartData.length-1))*i;
+    const t=d.timestamp?new Date(d.timestamp).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):`#${i+1}`;
+    ctx.fillText(t,x,H-pad.b+16);
+  }});
+
+  function line(data,color){
+    ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineJoin='round';
+    data.forEach((v,i)=>{const x=pad.l+(cW/(data.length-1))*i;const y=pad.t+cH-((v-minV)/(maxV-minV))*cH;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+    ctx.stroke();
+    const last=data.length-1;
+    ctx.lineTo(pad.l+cW,pad.t+cH);ctx.lineTo(pad.l,pad.t+cH);ctx.closePath();
+    ctx.fillStyle=color.replace('1)','0.05)');ctx.fill();
+  }
+  line(hrs,'rgba(239,68,68,1)');
+  line(spo2s,'rgba(99,102,241,1)');
+  line(glus,'rgba(245,158,11,1)');
+
+  // Legend
+  ctx.font='10px Inter';const ly=H-8;
+  [{c:'#ef4444',l:'HR'},{c:'#6366f1',l:'SpO2'},{c:'#f59e0b',l:'Glucose'}].forEach((item,i)=>{
+    const lx=pad.l+i*80;ctx.fillStyle=item.c;ctx.fillRect(lx,ly-3,10,3);ctx.fillText(item.l,lx+14,ly);
+  });
+}
+
+// ═══ PRESCRIPTIONS ═══
+let prescriptions=[
+  {patient:'LKT01',med:'Metformin 500mg',dose:'1 tablet',freq:'Twice daily',dur:'90 days',notes:'With meals',adherence:92},
+  {patient:'LKT01',med:'Amlodipine 5mg',dose:'1 tablet',freq:'Once daily',dur:'60 days',notes:'Morning',adherence:88},
+  {patient:'LKT03',med:'Warfarin 2mg',dose:'1 tablet',freq:'Once daily',dur:'Ongoing',notes:'Monitor INR',adherence:75},
+  {patient:'LKT05',med:'Salbutamol Inhaler',dose:'2 puffs',freq:'As needed',dur:'30 days',notes:'For breathlessness',adherence:60},
+  {patient:'LKT08',med:'Furosemide 40mg',dose:'1 tablet',freq:'Once daily',dur:'Ongoing',notes:'Monitor potassium',adherence:82},
+];
+
+function renderRx(){
+  const list=document.getElementById('rx-list');
+  list.innerHTML=prescriptions.map((rx,i)=>{
+    const p=patients.find(x=>x.id===rx.patient);
+    const aColor=rx.adherence>=80?'var(--accent-green)':rx.adherence>=60?'var(--accent-amber)':'var(--accent-red)';
+    return `<div class="rx-card">
+      <div class="rx-info"><div class="rx-name">${rx.med}</div><div class="rx-detail">${p?p.name:rx.patient} · ${rx.dose} · ${rx.freq} · ${rx.dur}</div>
+        ${rx.notes?`<div class="rx-detail" style="font-style:italic;margin-top:1px">📝 ${rx.notes}</div>`:''}</div>
+      <div class="rx-adherence"><div style="font-size:20px;font-weight:900;color:${aColor}">${rx.adherence}%</div><div style="font-size:10px;color:var(--text-muted)">Adherence</div></div>
+      <button class="btn btn-red" onclick="prescriptions.splice(${i},1);renderRx()" style="margin-left:10px;font-size:10px;padding:4px 8px">✕</button>
+    </div>`;
+  }).join('');
+
+  // Adherence alerts
+  const alerts=prescriptions.filter(rx=>rx.adherence<75);
+  const al=document.getElementById('adherence-alerts');
+  al.innerHTML=alerts.length?alerts.map(rx=>{
+    const p=patients.find(x=>x.id===rx.patient);
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-color)">
+      <div style="width:32px;height:32px;border-radius:8px;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;font-size:14px">⚠️</div>
+      <div style="flex:1"><div style="font-size:12px;font-weight:700">${p?p.name:rx.patient}</div><div style="font-size:11px;color:var(--accent-red)">${rx.med} — adherence at ${rx.adherence}%</div></div>
+      <button class="btn btn-outline" style="font-size:10px;padding:4px 10px" onclick="alert('Reminder sent!')">Send Reminder</button>
+    </div>`;
+  }).join(''):'<div style="text-align:center;color:var(--text-muted);font-size:12px;padding:20px">All patients maintaining good adherence ✓</div>';
+}
+
+function addPrescription(){
+  const patient=document.getElementById('rx-patient').value;
+  const med=document.getElementById('rx-med').value;
+  const dose=document.getElementById('rx-dose').value;
+  const freq=document.getElementById('rx-freq').value;
+  const dur=document.getElementById('rx-dur').value;
+  const notes=document.getElementById('rx-notes').value;
+  if(!med){alert('Please enter a medication name');return;}
+  prescriptions.unshift({patient,med,dose:dose||'As prescribed',freq,dur:dur||'30 days',notes,adherence:100});
+  renderRx();
+  ['rx-med','rx-dose','rx-dur','rx-notes'].forEach(id=>document.getElementById(id).value='');
+  alert(`✅ ${med} prescribed for ${patients.find(p=>p.id===patient)?.name||patient}`);
+}
+
+// ═══ TRIAGE ═══
+let triageFilter='all';
+let triageStatuses={};
+
+async function fetchTriage(){
+  try{
+    const r=await fetch(`${API}/hospital/emergencies`);
+    const evts=await r.json();
+    const list=document.getElementById('triage-list');
+    if(!evts.length){list.innerHTML='<div style="text-align:center;color:var(--text-muted);padding:48px;font-size:13px">No active alerts ✓</div>';return;}
+    const badge=document.getElementById('alert-badge');
+    const pending=evts.filter(e=>!triageStatuses[e.user_id+'_'+e.timestamp]).length;
+    if(pending>0){badge.style.display='flex';badge.textContent=pending;}else{badge.style.display='none';}
+    const filtered=triageFilter==='all'?evts:evts.filter(e=>{const key=e.user_id+'_'+e.timestamp;const s=triageStatuses[key]||'pending';return s===triageFilter;});
+    list.innerHTML=filtered.map(e=>{
+      const key=e.user_id+'_'+e.timestamp;
+      const status=triageStatuses[key]||'pending';
+      const ts=e.timestamp?new Date(e.timestamp).toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'}):'--';
+      return `<div class="triage-item">
+        <div class="triage-icon" style="background:${status==='reviewed'?'var(--accent-light)':status==='followup'?'rgba(245,158,11,0.1)':'rgba(239,68,68,0.08)'}">
+          ${status==='reviewed'?'✓':status==='followup'?'🔄':'🚨'}</div>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700;margin-bottom:2px">${e.user_id} — ${ts}</div>
+          <div style="font-size:11px;color:var(--accent-red);font-weight:600">${(e.alert_message||'Emergency Alert').substring(0,120)}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">🏥 ${e.hospital?.name||'--'} · <span class="badge ${status}" style="font-size:9px">${status.toUpperCase()}</span></div>
+          <div class="triage-actions">
+            <button class="triage-btn reviewed" onclick="setTriageStatus('${key}','reviewed')">✓ Reviewed</button>
+            <button class="triage-btn followup" onclick="setTriageStatus('${key}','followup')">🔄 Follow-up</button>
+            <button class="triage-btn dispatch" onclick="setTriageStatus('${key}','dispatched')">🚨 Dispatch</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){document.getElementById('triage-list').innerHTML='<div style="text-align:center;color:var(--text-muted);padding:48px;font-size:13px">Unable to load alerts</div>';}
+}
+
+function setTriageStatus(key,status){
+  triageStatuses[key]=status;fetchTriage();
+}
+function filterTriage(f){triageFilter=f;fetchTriage();}
+
+// ═══ TELEHEALTH ═══
+function renderTelehealth(){
+  const queue=document.getElementById('consult-queue');
+  const waiting=patients.filter(p=>p.risk!=='stable');
+  queue.innerHTML=waiting.map(p=>`<div class="consult-card">
+    <div class="consult-avatar" style="background:${p.bg}">${p.name.charAt(0)}</div>
+    <div class="consult-info"><div class="consult-name">${p.name}</div><div class="consult-meta">${p.condition} · <span class="badge ${p.risk}">${p.risk.toUpperCase()}</span></div></div>
+    <div class="consult-actions">
+      <button class="btn btn-accent" onclick="startConsult('video','${p.name}','${p.id}')" style="font-size:10px;padding:6px 12px">📹 Video</button>
+      <button class="btn btn-outline" onclick="startConsult('chat','${p.name}','${p.id}')" style="font-size:10px;padding:6px 12px">💬 Chat</button>
+    </div>
+  </div>`).join('');
+
+  const hist=document.getElementById('consult-history');
+  const logs=[
+    {name:'Rajesh Kumar',type:'Video',date:'10 Apr 2026, 3:30 PM',dur:'12 min',notes:'Reviewed BP trends. Adjusted Amlodipine dosage.'},
+    {name:'Vikram Patel',type:'Chat',date:'9 Apr 2026, 11:00 AM',dur:'8 min',notes:'Patient reported chest discomfort. Advised ECG.'},
+    {name:'Arjun Singh',type:'Video',date:'8 Apr 2026, 2:15 PM',dur:'15 min',notes:'Reviewed spirometry results. Stable.'},
+  ];
+  hist.innerHTML=logs.map(l=>`<div style="padding:12px 0;border-bottom:1px solid var(--border-color)">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:12px;font-weight:700">${l.name}</div>
+      <span class="badge ${l.type==='Video'?'sent':'stable'}">${l.type}</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:3px">${l.date} · ${l.dur}</div>
+    <div style="font-size:11px;color:var(--text-secondary);margin-top:3px">📝 ${l.notes}</div>
+  </div>`).join('');
+}
+
+function startConsult(type,name,uid){
+  activePatientUid = uid;
+  document.getElementById('call-patient-name').textContent = name;
+  document.getElementById('tele-overlay').classList.add('active');
+  document.getElementById('chat-msgs').innerHTML = '';
+  
+  if (type === 'video') {
+    startVideoCall(uid);
+  }
+}
+function saveNotes(){alert('💾 Consultation notes saved successfully!');}
+
+// ═══ REFERRALS ═══
+let referrals=[
+  {patient:'LKT03',specialist:'Cardiologist',to:'Dr. Arun Mehta',hospital:'Apollo HSR',reason:'Persistent arrhythmia requiring specialist evaluation',status:'sent',date:'10 Apr 2026'},
+  {patient:'LKT05',specialist:'Pulmonologist',to:'Dr. Priya Kapoor',hospital:'Manipal Hospital',reason:'COPD exacerbation — review inhaler regimen',status:'sent',date:'9 Apr 2026'},
+  {patient:'LKT01',specialist:'Endocrinologist',to:'Dr. Sanjay Rao',hospital:'Narayana Health',reason:'Uncontrolled diabetes — HbA1c review',status:'completed',date:'5 Apr 2026'},
+  {patient:'LKT08',specialist:'Nephrologist',to:'Dr. Kavitha Iyer',hospital:'Fortis Hospital',reason:'Declining renal function — eGFR trending down',status:'completed',date:'3 Apr 2026'},
+];
+
+function renderReferrals(){
+  const active=referrals.filter(r=>r.status!=='completed');
+  const done=referrals.filter(r=>r.status==='completed');
+  document.getElementById('referral-active').innerHTML=active.length?active.map(r=>{
+    const p=patients.find(x=>x.id===r.patient);
+    return `<div class="referral-card">
+      <div class="ref-top"><div><div class="ref-patient">${p?p.name:r.patient}</div><div class="ref-detail">${p?p.condition:''} · ${r.date}</div></div><span class="badge sent">${r.status.toUpperCase()}</span></div>
+      <div class="ref-specialist">→ ${r.to} (${r.specialist}) — ${r.hospital}</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:6px">${r.reason}</div>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-green" onclick="alert('Referral acknowledged!')" style="font-size:10px;padding:4px 10px">Mark Acknowledged</button><button class="btn btn-outline" onclick="alert('Follow-up scheduled!')" style="font-size:10px;padding:4px 10px">Schedule Follow-up</button></div>
+    </div>`;
+  }).join(''):'<div style="text-align:center;color:var(--text-muted);font-size:12px;padding:20px">No active referrals</div>';
+
+  document.getElementById('referral-done').innerHTML=done.length?done.map(r=>{
+    const p=patients.find(x=>x.id===r.patient);
+    return `<div class="referral-card" style="opacity:0.8">
+      <div class="ref-top"><div><div class="ref-patient">${p?p.name:r.patient}</div><div class="ref-detail">${r.date}</div></div><span class="badge completed">COMPLETED</span></div>
+      <div class="ref-specialist">→ ${r.to} (${r.specialist})</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">${r.reason}</div>
+    </div>`;
+  }).join(''):'<div style="text-align:center;color:var(--text-muted);font-size:12px;padding:20px">No completed referrals</div>';
+}
+
+// ═══ MODAL ═══
+let curModal=null;
+function openModal(type){
+  curModal=type;const body=document.getElementById('modal-body');
+  if(type==='add-patient'){
+    document.getElementById('modal-title').textContent='Add New Patient';
+    document.getElementById('modal-subtitle').textContent='Register a new patient for monitoring';
+    body.innerHTML=`<div class="form-row"><div class="form-group"><label>Full Name</label><input id="m-name" placeholder="Patient name"/></div><div class="form-group"><label>Age</label><input id="m-age" type="number" placeholder="Age"/></div></div>
+      <div class="form-row"><div class="form-group"><label>Patient ID</label><input id="m-pid" placeholder="e.g., LKT11"/></div><div class="form-group"><label>Condition</label><input id="m-cond" placeholder="Primary condition"/></div></div>`;
+  }else if(type==='new-rx'){
+    document.getElementById('modal-title').textContent='Quick Prescription';
+    document.getElementById('modal-subtitle').textContent='Issue a new prescription';
+    body.innerHTML=`<div class="form-group" style="margin-bottom:12px"><label>Patient</label><select id="m-rx-pat" style="width:100%;padding:9px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;background:#f8fafc">${patients.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select></div>
+      <div class="form-group" style="margin-bottom:12px"><label>Medication</label><input id="m-rx-med" class="modal-input" placeholder="Medication name & strength"/></div>
+      <div class="form-row"><div class="form-group"><label>Dosage</label><input id="m-rx-dose" class="modal-input" placeholder="e.g., 1 tablet"/></div><div class="form-group"><label>Frequency</label><input id="m-rx-freq" class="modal-input" placeholder="e.g., Twice daily"/></div></div>`;
+  }else if(type==='new-referral'){
+    document.getElementById('modal-title').textContent='New Referral';
+    document.getElementById('modal-subtitle').textContent='Refer a patient to a specialist';
+    body.innerHTML=`<div class="form-group" style="margin-bottom:12px"><label>Patient</label><select id="m-ref-pat" style="width:100%;padding:9px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;background:#f8fafc">${patients.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select></div>
+      <div class="form-row"><div class="form-group"><label>Specialist Type</label><select id="m-ref-spec" style="width:100%;padding:9px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;background:#f8fafc"><option>Cardiologist</option><option>Neurologist</option><option>Pulmonologist</option><option>Endocrinologist</option><option>Nephrologist</option><option>Gastroenterologist</option><option>Oncologist</option></select></div>
+      <div class="form-group"><label>Specialist Name</label><input id="m-ref-name" class="modal-input" placeholder="Dr. Name"/></div></div>
+      <div class="form-group" style="margin-bottom:12px"><label>Hospital</label><input id="m-ref-hosp" class="modal-input" placeholder="Specialist's hospital"/></div>
+      <div class="form-group"><label>Reason for Referral</label><input id="m-ref-reason" class="modal-input" placeholder="Clinical justification"/></div>`;
+  }
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(e){if(e&&e.target!==e.currentTarget)return;document.getElementById('modal-overlay').classList.remove('open');curModal=null;}
+function submitModal(){
+  if(curModal==='add-patient'){
+    const name=document.getElementById('m-name')?.value;
+    const age=parseInt(document.getElementById('m-age')?.value)||0;
+    const pid=document.getElementById('m-pid')?.value;
+    const cond=document.getElementById('m-cond')?.value;
+    if(!name||!pid){alert('Please fill Name and Patient ID');return;}
+    patients.push({id:pid,name,age,condition:cond||'General Monitoring',risk:'stable',hr:75,spo2:98,bp:'120/80',glucose:100,temp:36.6,lastSeen:'Now',bg:'#22c55e'});
+    renderPatients(patients);
+    alert(`✅ ${name} (${pid}) added to patient directory`);
+  }else if(curModal==='new-rx'){
+    const pat=document.getElementById('m-rx-pat')?.value;
+    const med=document.getElementById('m-rx-med')?.value;
+    if(!med){alert('Please enter medication');return;}
+    prescriptions.unshift({patient:pat,med,dose:document.getElementById('m-rx-dose')?.value||'As prescribed',freq:document.getElementById('m-rx-freq')?.value||'Once daily',dur:'30 days',notes:'',adherence:100});
+    renderRx();alert(`✅ Prescription added`);
+  }else if(curModal==='new-referral'){
+    const pat=document.getElementById('m-ref-pat')?.value;
+    const spec=document.getElementById('m-ref-spec')?.value;
+    const name=document.getElementById('m-ref-name')?.value;
+    const hosp=document.getElementById('m-ref-hosp')?.value;
+    const reason=document.getElementById('m-ref-reason')?.value;
+    if(!name||!reason){alert('Please fill specialist name and reason');return;}
+    referrals.unshift({patient:pat,specialist:spec,to:name,hospital:hosp||'--',reason,status:'sent',date:new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})});
+    renderReferrals();alert(`✅ Referral sent to ${name}`);
+  }
+  closeModal();
+}
+
+// ═══ WEBSOCKET ═══
+function connectWS(){
+  try{const ws=new WebSocket('ws://localhost:8000/hospital/ws');
+    ws.onopen=()=>{document.getElementById('conn-lbl').textContent='Live';};
+    ws.onmessage=()=>{if(curPage==='triage')fetchTriage();if(curPage==='clinical')loadClinical();};
+    ws.onclose=()=>setTimeout(connectWS,3000);
+  }catch(e){document.getElementById('conn-lbl').textContent='Polling';}
+}
+
+// ═══ TELEHEALTH LOGIC ═══
+let teleWS, activePatientUid, localStream, peerConn;
+const DOCTOR_ID = 'DOC_001';
+const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+function connectTeleWS() {
+  teleWS = new WebSocket(`ws://localhost:8000/ws/telehealth/${DOCTOR_ID}`);
+  teleWS.onmessage = async (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'chat') appendMsg(msg.from, msg.data.text, 'patient');
+    if (msg.type === 'signal') handleSignal(msg.from, msg.data);
+  };
+  teleWS.onclose = () => setTimeout(connectTeleWS, 3000);
+}
+
+function appendMsg(from, text, side) {
+  const el = document.getElementById('chat-msgs');
+  const div = document.createElement('div');
+  div.className = `msg ${side}`;
+  div.innerHTML = `<div>${text}</div><div class="msg-time">${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function sendMsg() {
+  const inp = document.getElementById('chat-input');
+  const text = inp.value.trim();
+  if (!text || !activePatientUid) return;
+  const msg = { type: 'chat', to: activePatientUid, data: { text } };
+  teleWS.send(JSON.stringify(msg));
+  appendMsg('Me', text, 'doctor');
+  inp.value = '';
+}
+
+async function startVideoCall(uid) {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    document.getElementById('localVideo').srcObject = localStream;
+    
+    peerConn = new RTCPeerConnection(rtcConfig);
+    localStream.getTracks().forEach(t => peerConn.addTrack(t, localStream));
+    
+    peerConn.onicecandidate = e => {
+      if (e.candidate) teleWS.send(JSON.stringify({ type: 'signal', to: uid, data: { ice: e.candidate } }));
+    };
+    
+    peerConn.ontrack = e => {
+      document.getElementById('remoteVideo').srcObject = e.streams[0];
+    };
+    
+    const offer = await peerConn.createOffer();
+    await peerConn.setLocalDescription(offer);
+    teleWS.send(JSON.stringify({ type: 'signal', to: uid, data: { sdp: offer } }));
+  } catch (e) { console.error('Call Error:', e); alert('Could not access camera/mic'); }
+}
+
+async function handleSignal(from, data) {
+  if (data.sdp && data.sdp.type === 'answer') {
+    await peerConn.setRemoteDescription(new RTCSessionDescription(data.sdp));
+  } else if (data.ice) {
+    await peerConn.addIceCandidate(new RTCIceCandidate(data.ice));
+  }
+}
+
+function toggleMute() {
+  const t = localStream.getAudioTracks()[0];
+  t.enabled = !t.enabled;
+  document.getElementById('btn-mute').classList.toggle('off', !t.enabled);
+}
+function toggleCam() {
+  const t = localStream.getVideoTracks()[0];
+  t.enabled = !t.enabled;
+  document.getElementById('btn-cam').classList.toggle('off', !t.enabled);
+}
+function endCall() {
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
+  if (peerConn) peerConn.close();
+  document.getElementById('tele-overlay').classList.remove('active');
+  document.getElementById('localVideo').srcObject = null;
+  document.getElementById('remoteVideo').srcObject = null;
+}
+
+// ═══ INIT ═══
+populateSelects();
+renderPatients(patients);
+renderRx();
+renderTelehealth();
+renderReferrals();
+fetchTriage();
+connectWS();
+connectTeleWS();
+setInterval(fetchTriage,10000);
+</script>
+</body>
+</html>

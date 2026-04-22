@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+venv/
+.env
+firebase-adminsdk.json
+google-services.json
+GoogleService-Info.plist
+mobile/.dart_tool/
+mobile/build/
+.vscode/
+.idea/

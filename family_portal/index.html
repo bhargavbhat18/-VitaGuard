@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>VitalGuard — Family Dashboard</title>
+<meta name="description" content="VitalGuard Family Dashboard — Monitor your loved ones' health, receive emergency alerts, and stay connected in real-time."/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bg-primary: #f8f9fb;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --border-color: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent-red: #ef4444;
+  --accent-blue: #3b82f6;
+  --accent-green: #22c55e;
+  --accent-amber: #f59e0b;
+  --accent-teal: #14b8a6;
+  --gradient-red: linear-gradient(135deg, #B6171E, #ef4444);
+  --gradient-blue: linear-gradient(135deg, #2563eb, #3b82f6);
+  --gradient-green: linear-gradient(135deg, #16a34a, #22c55e);
+  --gradient-teal: linear-gradient(135deg, #0d9488, #14b8a6);
+  --sidebar-width: 72px;
+  --header-height: 64px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; font-family:'Inter',sans-serif; }
+
+body { background:var(--bg-primary); color:var(--text-primary); min-height:100vh; overflow-x:hidden; }
+
+::-webkit-scrollbar { width:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(0,0,0,0.12); border-radius:10px; }
+
+/* ─── Sidebar ─── */
+.sidebar {
+  position:fixed; top:0; left:0; width:var(--sidebar-width); height:100vh;
+  background:#ffffff; border-right:1px solid var(--border-color);
+  display:flex; flex-direction:column; align-items:center; padding:16px 0; z-index:200;
+}
+.sidebar-logo {
+  width:42px; height:42px; background:var(--gradient-teal); border-radius:14px;
+  display:flex; align-items:center; justify-content:center; margin-bottom:28px;
+  box-shadow:0 4px 20px rgba(20,184,166,0.35); cursor:pointer;
+  transition:transform .3s ease, box-shadow .3s ease;
+}
+.sidebar-logo:hover { transform:scale(1.08); box-shadow:0 6px 28px rgba(20,184,166,0.5); }
+.sidebar-nav { display:flex; flex-direction:column; align-items:center; gap:6px; flex:1; }
+.nav-btn {
+  width:44px; height:44px; border-radius:14px; border:none; background:transparent;
+  color:var(--text-muted); cursor:pointer; display:flex; align-items:center;
+  justify-content:center; transition:all .25s ease; position:relative;
+}
+.nav-btn:hover { background:rgba(0,0,0,0.05); color:var(--text-primary); }
+.nav-btn.active { background:rgba(20,184,166,0.1); color:#0d9488; }
+.nav-btn.active::before {
+  content:''; position:absolute; left:-14px; top:50%; transform:translateY(-50%);
+  width:3px; height:20px; background:var(--gradient-teal); border-radius:0 3px 3px 0;
+}
+.nav-btn svg { width:20px; height:20px; }
+.nav-btn .tip {
+  position:absolute; left:56px; background:#0f172a; color:#f1f5f9;
+  padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600;
+  white-space:nowrap; opacity:0; pointer-events:none;
+  transition:opacity .2s, transform .2s; transform:translateX(-4px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.12); z-index:300;
+}
+.nav-btn:hover .tip { opacity:1; transform:translateX(0); }
+.sidebar-bottom { display:flex; flex-direction:column; align-items:center; gap:6px; padding-bottom:8px; }
+
+/* ─── Header ─── */
+.top-header {
+  position:fixed; top:0; left:var(--sidebar-width); right:0; height:var(--header-height);
+  background:rgba(255,255,255,0.88); backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border-color);
+  display:flex; align-items:center; justify-content:space-between; padding:0 28px; z-index:150;
+}
+.header-title h1 {
+  font-size:18px; font-weight:800;
+  background:linear-gradient(135deg,#0f172a,#334155);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+.header-title .subtitle { font-size:12px; color:var(--text-muted); font-weight:500; }
+.header-right { display:flex; align-items:center; gap:14px; }
+.status-badge {
+  display:flex; align-items:center; gap:8px; padding:6px 16px; border-radius:24px;
+  font-size:12px; font-weight:700; background:rgba(34,197,94,0.08);
+  border:1px solid rgba(34,197,94,0.18); color:var(--accent-green);
+}
+.status-dot {
+  width:8px; height:8px; border-radius:50%; background:var(--accent-green);
+  animation:pulse-dot 1.5s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { opacity:1; box-shadow:0 0 0 0 rgba(34,197,94,0.4); }
+  50% { opacity:.6; box-shadow:0 0 0 6px rgba(34,197,94,0); }
+}
+.clock { font-size:13px; color:var(--text-secondary); font-weight:500; font-variant-numeric:tabular-nums; }
+.header-btn {
+  width:38px; height:38px; border-radius:12px; border:1px solid var(--border-color);
+  background:transparent; color:var(--text-secondary); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; transition:all .2s;
+}
+.header-btn:hover { background:rgba(0,0,0,0.04); color:var(--text-primary); }
+.header-btn svg { width:18px; height:18px; }
+
+/* ─── Main ─── */
+.main-content {
+  margin-left:var(--sidebar-width); margin-top:var(--header-height);
+  padding:24px; min-height:calc(100vh - var(--header-height));
+}
+
+/* ─── Shared ─── */
+.page-view { display:none; }
+.page-view.active { display:block; }
+.page-header-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+.page-title { font-size:20px; font-weight:800; }
+.panel {
+  background:var(--bg-card); border:1px solid var(--border-color);
+  border-radius:16px; overflow:hidden; transition:border-color .3s;
+}
+.panel:hover { border-color:#cbd5e1; }
+.panel-header {
+  padding:16px 20px; border-bottom:1px solid var(--border-color);
+  display:flex; justify-content:space-between; align-items:center;
+}
+.panel-title { font-size:14px; font-weight:800; display:flex; align-items:center; gap:8px; }
+.panel-title .dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+.badge {
+  font-size:11px; font-weight:800; padding:4px 12px; border-radius:20px; display:inline-block;
+}
+.badge.red { background:rgba(239,68,68,0.1); color:var(--accent-red); }
+.badge.green { background:rgba(34,197,94,0.1); color:var(--accent-green); }
+.badge.amber { background:rgba(245,158,11,0.1); color:var(--accent-amber); }
+.badge.blue { background:rgba(59,130,246,0.1); color:var(--accent-blue); }
+.badge.teal { background:rgba(20,184,166,0.1); color:var(--accent-teal); }
+
+.btn-primary {
+  padding:10px 20px; background:var(--gradient-teal); color:#fff; border:none;
+  border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;
+  transition:all .2s; display:flex; align-items:center; gap:6px;
+}
+.btn-primary:hover { box-shadow:0 4px 16px rgba(20,184,166,0.3); transform:translateY(-1px); }
+.btn-danger {
+  padding:10px 20px; background:rgba(239,68,68,0.1); color:var(--accent-red);
+  border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;
+  transition:all .2s; display:flex; align-items:center; gap:6px;
+}
+.btn-danger:hover { background:rgba(239,68,68,0.15); }
+
+.stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.stat-card {
+  background:#fff; border:1px solid var(--border-color); border-radius:16px;
+  padding:22px; position:relative; overflow:hidden; transition:all .3s; cursor:default;
+}
+.stat-card:hover { border-color:#cbd5e1; transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,0,0,0.06); }
+.stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.stat-card.red::before { background:var(--gradient-red); }
+.stat-card.blue::before { background:var(--gradient-blue); }
+.stat-card.green::before { background:var(--gradient-green); }
+.stat-card.teal::before { background:var(--gradient-teal); }
+.stat-card.amber::before { background:linear-gradient(135deg,#d97706,#f59e0b); }
+.stat-icon { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; margin-bottom:14px; }
+.stat-card.red .stat-icon { background:rgba(239,68,68,0.1); }
+.stat-card.blue .stat-icon { background:rgba(59,130,246,0.1); }
+.stat-card.green .stat-icon { background:rgba(34,197,94,0.1); }
+.stat-card.teal .stat-icon { background:rgba(20,184,166,0.1); }
+.stat-card.amber .stat-icon { background:rgba(245,158,11,0.1); }
+.stat-label { font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:1.2px; text-transform:uppercase; margin-bottom:6px; }
+.stat-value { font-size:32px; font-weight:900; line-height:1; }
+.stat-card.red .stat-value { color:var(--accent-red); }
+.stat-card.blue .stat-value { color:var(--accent-blue); }
+.stat-card.green .stat-value { color:var(--accent-green); }
+.stat-card.teal .stat-value { color:var(--accent-teal); }
+.stat-card.amber .stat-value { color:var(--accent-amber); }
+.stat-sub { font-size:11px; color:var(--text-muted); margin-top:6px; font-weight:500; }
+
+#map { height:400px; border-radius:12px; border:1px solid var(--border-color); }
+
+/* ─── Family Cards ─── */
+.family-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+.family-card {
+  background:#fff; border:1px solid var(--border-color); border-radius:16px; padding:22px;
+  cursor:pointer; transition:all .3s; position:relative; overflow:hidden;
+}
+.family-card:hover { border-color:#cbd5e1; transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.06); }
+.family-card .fc-top { display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+.family-card .avatar {
+  width:48px; height:48px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; font-size:20px; font-weight:800; color:#fff; flex-shrink:0;
+}
+.family-card .fc-name { font-size:16px; font-weight:800; }
+.family-card .fc-relation { font-size:12px; color:var(--text-muted); font-weight:500; }
+.family-card .fc-vitals { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.fc-vital-item {
+  background:#f8fafc; border-radius:10px; padding:10px; text-align:center;
+}
+.fc-vital-label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; }
+.fc-vital-val { font-size:16px; font-weight:900; margin-top:2px; }
+
+/* ─── Vitals Gauges ─── */
+.vitals-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:24px; }
+.gauge-card {
+  background:#fff; border:1px solid var(--border-color); border-radius:16px;
+  padding:22px; text-align:center; transition:all .3s;
+}
+.gauge-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.06); }
+.gauge-ring {
+  width:90px; height:90px; border-radius:50%; margin:0 auto 14px;
+  display:flex; align-items:center; justify-content:center; position:relative;
+}
+.gauge-ring::before {
+  content:''; position:absolute; inset:0; border-radius:50%;
+  border:4px solid #f1f5f9;
+}
+.gauge-ring .g-val { font-size:22px; font-weight:900; z-index:1; }
+.gauge-label { font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; }
+.gauge-status { font-size:11px; font-weight:700; margin-top:6px; }
+.gauge-status.normal { color:var(--accent-green); }
+.gauge-status.elevated { color:var(--accent-amber); }
+.gauge-status.critical { color:var(--accent-red); }
+
+/* ─── Chart ─── */
+.chart-container { position:relative; width:100%; height:250px; }
+#vitalsChart { width:100%; height:100%; }
+
+/* ─── Timeline ─── */
+.timeline { position:relative; padding-left:28px; }
+.timeline::before {
+  content:''; position:absolute; left:8px; top:0; bottom:0; width:2px; background:#e2e8f0;
+}
+.timeline-item { position:relative; margin-bottom:24px; }
+.timeline-item::before {
+  content:''; position:absolute; left:-24px; top:4px; width:12px; height:12px;
+  border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 2px var(--border-color);
+}
+.timeline-item.resolved::before { background:var(--accent-green); box-shadow:0 0 0 2px rgba(34,197,94,0.3); }
+.timeline-item.active::before { background:var(--accent-red); box-shadow:0 0 0 2px rgba(239,68,68,0.3); animation:pulse-dot 1.5s infinite; }
+.timeline-item.triggered::before { background:var(--accent-amber); box-shadow:0 0 0 2px rgba(245,158,11,0.3); }
+.tl-card {
+  background:#fff; border:1px solid var(--border-color); border-radius:12px; padding:16px 20px;
+}
+.tl-date { font-size:11px; color:var(--text-muted); font-weight:600; margin-bottom:4px; }
+.tl-msg { font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px; }
+.tl-meta { font-size:12px; color:var(--text-secondary); }
+
+/* ─── Alert Items ─── */
+.alert-item {
+  padding:16px 20px; border-bottom:1px solid var(--border-color);
+  display:flex; align-items:flex-start; gap:14px; transition:background .2s;
+}
+.alert-item:hover { background:#fef2f2; }
+.alert-icon {
+  width:40px; height:40px; border-radius:12px; display:flex; align-items:center;
+  justify-content:center; font-size:18px; flex-shrink:0;
+}
+.alert-icon.critical { background:rgba(239,68,68,0.1); }
+.alert-icon.warning { background:rgba(245,158,11,0.1); }
+
+/* ─── Action Cards ─── */
+.actions-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
+.action-card {
+  background:#fff; border:1px solid var(--border-color); border-radius:16px;
+  padding:28px; text-align:center; cursor:pointer; transition:all .3s;
+}
+.action-card:hover { transform:translateY(-3px); box-shadow:0 8px 28px rgba(0,0,0,0.08); }
+.action-card .a-icon {
+  width:60px; height:60px; border-radius:16px; margin:0 auto 16px;
+  display:flex; align-items:center; justify-content:center; font-size:28px;
+}
+.action-card .a-title { font-size:15px; font-weight:800; margin-bottom:4px; }
+.action-card .a-desc { font-size:12px; color:var(--text-muted); }
+
+/* ─── Settings ─── */
+.settings-group { margin-bottom:24px; }
+.settings-group-title { font-size:15px; font-weight:700; margin-bottom:12px; }
+.setting-item {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 18px; background:#fff; border:1px solid var(--border-color);
+  border-radius:12px; margin-bottom:8px;
+}
+.setting-label { font-size:13px; font-weight:600; }
+.setting-desc { font-size:11px; color:var(--text-muted); margin-top:2px; }
+.toggle {
+  width:44px; height:24px; border-radius:12px; background:#cbd5e1;
+  border:none; cursor:pointer; position:relative; transition:background .3s;
+}
+.toggle.on { background:var(--accent-green); }
+.toggle::after {
+  content:''; position:absolute; top:3px; left:3px; width:18px; height:18px;
+  border-radius:50%; background:#fff; transition:transform .3s;
+}
+.toggle.on::after { transform:translateX(20px); }
+
+.nominee-card {
+  background:#fff; border:1px solid var(--border-color); border-radius:16px;
+  padding:22px; display:flex; align-items:center; gap:16px; margin-bottom:12px;
+}
+.nominee-avatar {
+  width:52px; height:52px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; font-size:22px; font-weight:800; color:#fff; flex-shrink:0;
+}
+.nominee-info { flex:1; }
+.nominee-name { font-size:15px; font-weight:800; }
+.nominee-detail { font-size:12px; color:var(--text-muted); margin-top:2px; }
+
+.modal-input {
+  width:100%; padding:10px 14px; background:#f8fafc; border:1px solid var(--border-color);
+  border-radius:10px; color:var(--text-primary); font-size:13px; font-weight:500; outline:none;
+  transition:border-color .2s;
+}
+.modal-input:focus { border-color:rgba(20,184,166,0.4); }
+
+/* ─── Modal ─── */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.3); backdrop-filter:blur(8px);
+  z-index:500; display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity .25s;
+}
+.modal-overlay.open { opacity:1; pointer-events:all; }
+.modal-box {
+  background:#fff; border:1px solid var(--border-color); border-radius:20px;
+  padding:32px; width:440px; max-width:90vw;
+  transform:scale(0.95) translateY(10px); transition:transform .25s;
+  box-shadow:0 24px 64px rgba(0,0,0,0.12);
+}
+.modal-overlay.open .modal-box { transform:scale(1) translateY(0); }
+.modal-title { font-size:18px; font-weight:800; margin-bottom:6px; }
+.modal-subtitle { font-size:13px; color:var(--text-muted); margin-bottom:20px; }
+.modal-section { margin-bottom:16px; }
+.modal-section label {
+  font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;
+  letter-spacing:1px; display:block; margin-bottom:6px;
+}
+.modal-actions { display:flex; gap:10px; margin-top:20px; }
+.modal-btn {
+  flex:1; padding:11px; border-radius:12px; font-size:13px; font-weight:700;
+  cursor:pointer; border:none; transition:all .2s;
+}
+.modal-btn.cancel { background:#f1f5f9; color:var(--text-secondary); }
+.modal-btn.cancel:hover { background:#e2e8f0; }
+.modal-btn.primary { background:var(--gradient-teal); color:#fff; }
+.modal-btn.primary:hover { box-shadow:0 4px 16px rgba(20,184,166,0.3); }
+
+/* ─── Animations ─── */
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.fade-in { animation:fadeIn .4s ease forwards; }
+
+/* ─── Responsive ─── */
+@media(max-width:1200px) {
+  .stats-grid,.vitals-grid { grid-template-columns:repeat(2,1fr); }
+  .actions-grid { grid-template-columns:1fr; }
+}
+@media(max-width:768px) {
+  .sidebar { display:none; }
+  .main-content { margin-left:0; }
+  .top-header { left:0; }
+  .stats-grid,.vitals-grid { grid-template-columns:1fr; }
+  .family-grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ Sidebar ═══ -->
+<nav class="sidebar">
+  <div class="sidebar-logo" title="VitalGuard Family">
+    <svg width="22" height="22" fill="white" viewBox="0 0 24 24"><path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/></svg>
+  </div>
+  <div class="sidebar-nav">
+    <button class="nav-btn active" id="nav-overview" onclick="switchPage('overview')" title="Family Circle">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="tip">Family Circle</span>
+    </button>
+    <button class="nav-btn" id="nav-vitals" onclick="switchPage('vitals')" title="Vitals">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span class="tip">Vitals Stream</span>
+    </button>
+    <button class="nav-btn" id="nav-alerts" onclick="switchPage('alerts')" title="Alerts">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="tip">Alert Center</span>
+    </button>
+    <button class="nav-btn" id="nav-actions" onclick="switchPage('actions')" title="Quick Actions">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <span class="tip">Quick Actions</span>
+    </button>
+    <button class="nav-btn" id="nav-history" onclick="switchPage('history')" title="Medical History">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span class="tip">Medical History</span>
+    </button>
+    <button class="nav-btn" id="nav-location" onclick="switchPage('location')" title="Location">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span class="tip">Location</span>
+    </button>
+  </div>
+  <div class="sidebar-bottom">
+    <button class="nav-btn" id="nav-nominee" onclick="switchPage('nominee')" title="Nominee Settings">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+      <span class="tip">Nominee Settings</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ═══ Header ═══ -->
+<header class="top-header">
+  <div class="header-title">
+    <div>
+      <h1>Family Care Dashboard</h1>
+      <div class="subtitle">Monitor & protect your loved ones</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-badge" id="conn-badge">
+      <div class="status-dot"></div>
+      <span id="conn-label">Connecting...</span>
+    </div>
+    <span class="clock" id="clock-el"></span>
+    <button class="header-btn" onclick="switchPage('alerts')" title="Alert Center" style="position:relative">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span id="alert-dot" style="position:absolute;top:6px;right:7px;width:7px;height:7px;background:var(--accent-red);border-radius:50%;border:2px solid #fff;display:none"></span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══ Main Content ═══ -->
+<main class="main-content">
+
+<!-- ──────── PAGE 1: Family Circle ──────── -->
+<section class="page-view active" id="page-overview">
+  <div class="page-header-bar">
+    <div class="page-title">👨‍👩‍👧‍👦 Family Circle</div>
+  </div>
+  <div class="family-grid" id="family-grid"></div>
+</section>
+
+<!-- ──────── PAGE 2: Vitals Stream ──────── -->
+<section class="page-view" id="page-vitals">
+  <div class="page-header-bar">
+    <div class="page-title">📊 Real-time Vitals Stream</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:12px;color:var(--text-muted);font-weight:600">Monitoring:</span>
+      <span style="font-size:13px;font-weight:800;color:var(--accent-teal)" id="vitals-user">LKT01</span>
+    </div>
+  </div>
+  <div class="vitals-grid" id="vitals-gauges"></div>
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot" style="background:var(--accent-blue)"></span> Vitals History (Last 20 readings)</div>
+      <button class="btn-primary" onclick="fetchVitalsHistory()" style="padding:6px 14px;font-size:12px">↻ Refresh</button>
+    </div>
+    <div style="padding:16px">
+      <div class="chart-container"><canvas id="vitalsChart"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────── PAGE 3: Alert Center ──────── -->
+<section class="page-view" id="page-alerts">
+  <div class="page-header-bar">
+    <div class="page-title">🚨 Emergency Alert Center</div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-primary" onclick="fetchAlerts()" style="padding:8px 16px;font-size:12px">↻ Refresh</button>
+      <button class="btn-danger" id="btn-clear" onclick="clearAlerts()">Clear All</button>
+    </div>
+  </div>
+  <div class="panel" id="alerts-panel">
+    <div id="alerts-list" style="max-height:70vh;overflow-y:auto">
+      <div style="text-align:center;color:var(--text-muted);padding:48px;font-size:13px">Loading alerts...</div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────── PAGE 4: Quick Actions ──────── -->
+<section class="page-view" id="page-actions">
+  <div class="page-header-bar">
+    <div class="page-title">⚡ Quick Actions</div>
+  </div>
+  <div class="actions-grid">
+    <div class="action-card" onclick="callPerson('patient')">
+      <div class="a-icon" style="background:rgba(20,184,166,0.1)">📞</div>
+      <div class="a-title">Call Patient</div>
+      <div class="a-desc">Directly dial your loved one</div>
+    </div>
+    <div class="action-card" onclick="callPerson('hospital')">
+      <div class="a-icon" style="background:rgba(59,130,246,0.1)">🏥</div>
+      <div class="a-title">Call Hospital</div>
+      <div class="a-desc">Reach the assigned hospital</div>
+    </div>
+    <div class="action-card" onclick="callPerson('doctor')">
+      <div class="a-icon" style="background:rgba(34,197,94,0.1)">👨‍⚕️</div>
+      <div class="a-title">Call Family Doctor</div>
+      <div class="a-desc">Connect with their physician</div>
+    </div>
+  </div>
+  <div class="panel" style="margin-bottom:20px">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot" style="background:var(--accent-red)"></span> Emergency SOS</div>
+    </div>
+    <div style="padding:20px;text-align:center">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Trigger an emergency SOS on behalf of your family member. This will alert the hospital and dispatch an ambulance.</p>
+      <button onclick="triggerSOS()" style="padding:14px 40px;background:var(--gradient-red);color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer;transition:all .3s;letter-spacing:.5px">🚨 TRIGGER EMERGENCY SOS</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot" style="background:var(--accent-teal)"></span> Patient Quick Info</div>
+    </div>
+    <div style="padding:20px" id="patient-info">
+      <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px">Loading patient info...</div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────── PAGE 5: Medical History ──────── -->
+<section class="page-view" id="page-history">
+  <div class="page-header-bar">
+    <div class="page-title">📋 Medical History Timeline</div>
+    <button class="btn-primary" onclick="exportHistory()">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download Summary
+    </button>
+  </div>
+  <div id="history-timeline" class="timeline">
+    <div style="text-align:center;color:var(--text-muted);padding:48px;font-size:13px">Loading history...</div>
+  </div>
+</section>
+
+<!-- ──────── PAGE 6: Location Tracking ──────── -->
+<section class="page-view" id="page-location">
+  <div class="page-header-bar">
+    <div class="page-title">📍 Location Tracking</div>
+    <button class="btn-primary" onclick="refreshLocation()">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Refresh Location
+    </button>
+  </div>
+  <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="stat-card teal">
+      <div class="stat-icon">📍</div>
+      <div class="stat-label">Current Status</div>
+      <div class="stat-value" style="font-size:20px" id="loc-status">Fetching...</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-icon">🏥</div>
+      <div class="stat-label">Nearest Hospital</div>
+      <div class="stat-value" style="font-size:16px" id="loc-hospital">--</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-icon">🚑</div>
+      <div class="stat-label">Active Ambulances</div>
+      <div class="stat-value" id="loc-amb-count">0</div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot" style="background:var(--accent-green)"></span> Live Map</div>
+      <div style="font-size:11px;color:var(--text-muted);display:flex;gap:12px">
+        <span>🏠 Patient</span><span>🚑 Ambulance</span><span>🏥 Hospital</span>
+      </div>
+    </div>
+    <div style="padding:16px"><div id="map"></div></div>
+  </div>
+</section>
+
+<!-- ──────── PAGE 7: Nominee Settings ──────── -->
+<section class="page-view" id="page-nominee">
+  <div class="page-header-bar">
+    <div class="page-title">👥 Nominee Settings</div>
+    <button class="btn-primary" onclick="openModal('add-nominee')">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Nominee
+    </button>
+  </div>
+  <div id="nominees-list"></div>
+
+  <div class="settings-group" style="margin-top:28px">
+    <div class="settings-group-title">Notification Preferences</div>
+    <div class="setting-item">
+      <div><div class="setting-label">Emergency Alerts</div><div class="setting-desc">Receive alerts for SOS and critical vitals</div></div>
+      <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+    </div>
+    <div class="setting-item">
+      <div><div class="setting-label">Daily Health Summary</div><div class="setting-desc">Get a daily digest of your loved one's vitals</div></div>
+      <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+    </div>
+    <div class="setting-item">
+      <div><div class="setting-label">Location Updates</div><div class="setting-desc">Notify when patient leaves a geofenced area</div></div>
+      <button class="toggle" onclick="this.classList.toggle('on')"></button>
+    </div>
+    <div class="setting-item">
+      <div><div class="setting-label">Sound Alerts</div><div class="setting-desc">Play audio for critical emergency notifications</div></div>
+      <button class="toggle" onclick="this.classList.toggle('on')"></button>
+    </div>
+  </div>
+
+  <div class="settings-group">
+    <div class="settings-group-title">Monitored Patient</div>
+    <div class="setting-item" style="flex-direction:column;align-items:stretch;gap:10px">
+      <div><div class="setting-label">Patient User ID</div><div class="setting-desc">The VitalGuard user ID to monitor</div></div>
+      <input class="modal-input" id="patient-uid-input" type="text" value="LKT01"/>
+    </div>
+    <div style="margin-top:8px">
+      <button class="btn-primary" onclick="changePatient()">Update Patient ID</button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ═══ Modal ═══ -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title" id="modal-title">Add Nominee</div>
+    <div class="modal-subtitle" id="modal-subtitle">Add a new family nominee</div>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn primary" onclick="submitModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ JavaScript ═══ -->
+<script>
+const API = 'http://localhost:8000';
+let MONITORED_USER = 'LKT01';
+let map, mapMarkers = {};
+
+// ════════════════════════════════
+// Clock
+// ════════════════════════════════
+setInterval(() => {
+  document.getElementById('clock-el').textContent = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}, 1000);
+
+// ════════════════════════════════
+// Navigation
+// ════════════════════════════════
+let currentPage = 'overview';
+function switchPage(page) {
+  document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const target = document.getElementById(`page-${page}`);
+  if (target) { target.classList.add('active'); target.classList.remove('fade-in'); void target.offsetWidth; target.classList.add('fade-in'); }
+  const btn = document.getElementById(`nav-${page}`);
+  if (btn) btn.classList.add('active');
+  currentPage = page;
+  if (page === 'location' && map) setTimeout(() => map.invalidateSize(), 200);
+  if (page === 'vitals') { fetchLatestVitals(); fetchVitalsHistory(); }
+  if (page === 'alerts') fetchAlerts();
+  if (page === 'history') fetchHistory();
+  if (page === 'location') refreshLocation();
+  if (page === 'overview') renderFamilyCircle();
+}
+
+let familyMembers = [];
+
+async function renderFamilyCircle() {
+  const grid = document.getElementById('family-grid');
+  grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);grid-column:1/-1">Loading family circle...</div>';
+  
+  try {
+    const r = await fetch(`${API}/family/members`, {
+      headers: { 'Authorization': `Bearer ${MONITORED_USER}` }
+    });
+    familyMembers = await r.json();
+    
+    if (!familyMembers.length) {
+      grid.innerHTML = `
+        <div style="text-align:center;padding:60px;color:var(--text-muted);grid-column:1/-1;background:white;border-radius:20px;border:1px dashed var(--border-color)">
+          <div style="font-size:40px;margin-bottom:16px">👨‍👩‍👧‍👦</div>
+          <div style="font-size:16px;font-weight:700;color:var(--text-primary)">No family members added</div>
+          <div style="font-size:13px;margin-top:4px">Add members in the mobile app profile settings to see them here.</div>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = familyMembers.map((m, i) => {
+      const colors = ['#0d9488', '#8b5cf6', '#2563eb', '#ec4899', '#f59e0b', '#ef4444'];
+      const bg = colors[i % colors.length];
+      const initials = m.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      
+      return `<div class="family-card">
+        <div class="fc-top">
+          <div class="avatar" style="background:${bg}">${initials}</div>
+          <div>
+            <div class="fc-name">${m.name}</div>
+            <div class="fc-relation">${m.relationship}</div>
+          </div>
+        </div>
+        <div style="padding:12px;background:#f8fafc;border-radius:12px;margin-top:10px">
+          <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Contact Number</div>
+          <div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
+            <span>📞</span> ${m.phone}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);grid-column:1/-1">Failed to load family members. Please check if the backend is running.</div>';
+  }
+}
+
+function selectMember(id) {
+  MONITORED_USER = id;
+  document.getElementById('vitals-user').textContent = id;
+  document.getElementById('patient-uid-input').value = id;
+  switchPage('vitals');
+}
+
+// ════════════════════════════════
+// Vitals
+// ════════════════════════════════
+async function fetchLatestVitals() {
+  const gauges = document.getElementById('vitals-gauges');
+  try {
+    const r = await fetch(`${API}/vitals/latest`, {headers:{'Authorization':`Bearer ${MONITORED_USER}`}});
+    const d = await r.json();
+    const items = [
+      { label:'Heart Rate', val:Math.round(d.heart_rate), unit:'bpm', color: d.heart_rate>100?'red':d.heart_rate>90?'amber':'green', status: d.heart_rate>100?'critical':d.heart_rate>90?'elevated':'normal' },
+      { label:'SpO2', val:Math.round(d.spO2||d.spo2||98), unit:'%', color: (d.spO2||d.spo2)<93?'red':(d.spO2||d.spo2)<95?'amber':'green', status:(d.spO2||d.spo2)<93?'critical':(d.spO2||d.spo2)<95?'elevated':'normal' },
+      { label:'Systolic BP', val:Math.round(d.bp_systolic), unit:'mmHg', color: d.bp_systolic>140?'red':d.bp_systolic>130?'amber':'green', status:d.bp_systolic>140?'critical':d.bp_systolic>130?'elevated':'normal' },
+      { label:'Glucose', val:Math.round(d.glucose), unit:'mg/dL', color: d.glucose>180?'red':d.glucose>140?'amber':'green', status:d.glucose>180?'critical':d.glucose>140?'elevated':'normal' },
+      { label:'Temperature', val:(d.temperature||36.6).toFixed(1), unit:'°C', color: d.temperature>38?'red':d.temperature>37.5?'amber':'green', status:d.temperature>38?'critical':d.temperature>37.5?'elevated':'normal' },
+    ];
+    gauges.innerHTML = items.map(i => {
+      const ringColor = i.color==='red'?'var(--accent-red)':i.color==='amber'?'var(--accent-amber)':'var(--accent-green)';
+      return `<div class="gauge-card">
+        <div class="gauge-ring" style="border:4px solid ${ringColor}; box-shadow:0 0 0 4px ${ringColor}22">
+          <span class="g-val" style="color:${ringColor}">${i.val}</span>
+        </div>
+        <div class="gauge-label">${i.label}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${i.unit}</div>
+        <div class="gauge-status ${i.status}">${i.status.toUpperCase()}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    gauges.innerHTML = `<div style="grid-column:span 5;text-align:center;padding:40px;color:var(--text-muted)">Unable to fetch vitals — Backend may be offline</div>`;
+  }
+}
+
+let chartData = [];
+async function fetchVitalsHistory() {
+  try {
+    const r = await fetch(`${API}/vitals/history?limit=20`, {headers:{'Authorization':`Bearer ${MONITORED_USER}`}});
+    chartData = (await r.json()).reverse();
+    drawChart();
+  } catch(e) {}
+}
+
+function drawChart() {
+  const canvas = document.getElementById('vitalsChart');
+  if (!canvas || !chartData.length) return;
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * 2; canvas.height = rect.height * 2;
+  ctx.scale(2,2);
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { t:20, r:20, b:30, l:45 };
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+  const hrs = chartData.map(d => d.heart_rate);
+  const spo2s = chartData.map(d => d.spO2 || d.spo2 || 98);
+  const allVals = [...hrs, ...spo2s];
+  const minV = Math.min(...allVals) - 5, maxV = Math.max(...allVals) + 5;
+
+  // Grid
+  ctx.strokeStyle = '#f1f5f9'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (cH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cW, y); ctx.stroke();
+    ctx.fillStyle = '#94a3b8'; ctx.font = '10px Inter';
+    ctx.fillText(Math.round(maxV - ((maxV - minV) / 4) * i), 4, y + 4);
+  }
+
+  function drawLine(data, color) {
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+    data.forEach((v, i) => {
+      const x = pad.l + (cW / (data.length - 1)) * i;
+      const y = pad.t + cH - ((v - minV) / (maxV - minV)) * cH;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    // Fill
+    const last = data.length - 1;
+    ctx.lineTo(pad.l + cW, pad.t + cH); ctx.lineTo(pad.l, pad.t + cH); ctx.closePath();
+    ctx.fillStyle = color.replace('1)', '0.06)'); ctx.fill();
+  }
+
+  drawLine(hrs, 'rgba(239,68,68,1)');
+  drawLine(spo2s, 'rgba(59,130,246,1)');
+
+  // Legend
+  ctx.font = '11px Inter'; ctx.fillStyle = '#ef4444';
+  ctx.fillRect(pad.l, H - 12, 12, 3); ctx.fillText('Heart Rate', pad.l + 16, H - 8);
+  ctx.fillStyle = '#3b82f6';
+  ctx.fillRect(pad.l + 100, H - 12, 12, 3); ctx.fillText('SpO2', pad.l + 116, H - 8);
+}
+
+// ════════════════════════════════
+// Alerts
+// ════════════════════════════════
+async function fetchAlerts() {
+  try {
+    const r = await fetch(`${API}/hospital/emergencies`);
+    const evts = await r.json();
+    const list = document.getElementById('alerts-list');
+    if (!evts.length) {
+      list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:48px;font-size:13px">🎉 No active emergencies — Your family is safe</div>';
+      document.getElementById('alert-dot').style.display = 'none';
+      return;
+    }
+    document.getElementById('alert-dot').style.display = 'block';
+    list.innerHTML = evts.map(e => {
+      const sev = (e.alert_message||'').toLowerCase().includes('critical') ? 'critical' : 'warning';
+      return `<div class="alert-item">
+        <div class="alert-icon ${sev}">${sev==='critical'?'🚨':'⚠️'}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;margin-bottom:3px">${e.user_id} — Emergency Alert</div>
+          <div style="font-size:12px;color:var(--accent-red);font-weight:600;margin-bottom:3px">${(e.alert_message||'').substring(0,120)}</div>
+          <div style="font-size:11px;color:var(--text-muted)">🏥 ${e.hospital?.name||'Assigning...'} · 📍 ${e.location?.lat?.toFixed(4)||'--'}, ${e.location?.lng?.toFixed(4)||'--'}</div>
+        </div>
+        <span class="badge red">${(e.status||'TRIGGERED').replace(/_/g,' ').toUpperCase()}</span>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('alerts-list').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:48px;font-size:13px">Unable to load alerts</div>';
+  }
+}
+
+function clearAlerts() {
+  if (confirm('Clear all alerts from view?'))
+    document.getElementById('alerts-list').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:48px;font-size:13px">All alerts cleared</div>';
+}
+
+// ════════════════════════════════
+// Quick Actions
+// ════════════════════════════════
+function callPerson(type) {
+  const nums = { patient:'+91-9876543210', hospital:'+91-080-2222-3333', doctor:'+91-9988776655' };
+  const labels = { patient:'Patient', hospital:'Hospital', doctor:'Family Doctor' };
+  const num = nums[type];
+  if (confirm(`Call ${labels[type]}?\n${num}`)) {
+    window.open(`tel:${num.replace(/[^+\d]/g,'')}`);
+  }
+}
+
+function triggerSOS() {
+  if (confirm('⚠️ This will trigger an emergency SOS!\n\nAn ambulance will be dispatched and the hospital alerted.\n\nContinue?')) {
+    alert(`🚨 SOS Triggered for ${MONITORED_USER}!\n\nHospital has been notified.\nAmbulance is being dispatched.`);
+  }
+}
+
+// ════════════════════════════════
+// Medical History
+// ════════════════════════════════
+async function fetchHistory() {
+  const el = document.getElementById('history-timeline');
+  try {
+    const r = await fetch(`${API}/sos/history`, {headers:{'Authorization':`Bearer ${MONITORED_USER}`}});
+    const events = await r.json();
+    if (!events.length) {
+      el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:48px;font-size:13px">No medical history recorded yet</div>';
+      return;
+    }
+    el.innerHTML = events.map(e => {
+      const status = e.status || 'triggered';
+      const date = e.timestamp ? new Date(e.timestamp).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) : '--';
+      return `<div class="timeline-item ${status}">
+        <div class="tl-card">
+          <div class="tl-date">${date}</div>
+          <div class="tl-msg">${e.alert_message || 'Emergency Event'}</div>
+          <div class="tl-meta">
+            🏥 ${e.hospital?.name || '--'} · 
+            <span class="badge ${status==='resolved'?'green':status==='ambulance_en_route'?'amber':'red'}" style="font-size:10px;padding:2px 8px">${status.replace(/_/g,' ').toUpperCase()}</span>
+            ${e.location ? ` · 📍 ${e.location.lat?.toFixed(4)}, ${e.location.lng?.toFixed(4)}` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:48px;font-size:13px">Unable to load history</div>';
+  }
+}
+
+function exportHistory() {
+  alert('📥 Download started!\n\nMedical history summary is being exported as PDF.\n(In production, this generates a downloadable report.)');
+}
+
+// ════════════════════════════════
+// Location
+// ════════════════════════════════
+function initMap() {
+  map = L.map('map',{zoomControl:true}).setView([12.9716,77.5946],12);
+  L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+    subdomains:['mt0','mt1','mt2','mt3'], attribution:'© Google maps', maxZoom:20
+  }).addTo(map);
+}
+
+async function refreshLocation() {
+  try {
+    // 1. Fetch patient location from backend
+    const rPat = await fetch(`${API}/sos/patient-location/${MONITORED_USER}`);
+    const patLoc = await rPat.json();
+    
+    // Update UI status
+    const statusEl = document.getElementById('loc-status');
+    if (patLoc.is_live) {
+      statusEl.innerHTML = '<span style="color:var(--accent-red);animation:pulse-dot 1.5s infinite">● Live Tracking</span>';
+    } else {
+      statusEl.textContent = patLoc.status === 'normal' ? 'At Home' : patLoc.status.toUpperCase();
+    }
+
+    // Update patient marker
+    if (mapMarkers.pat) map.removeLayer(mapMarkers.pat);
+    const patIcon = L.divIcon({
+      html: `<div style="background:${patLoc.is_live?'var(--accent-red)':'#B6171E'};border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;border:3px solid white;box-shadow:0 3px 10px ${patLoc.is_live?'rgba(239,68,68,0.4)':'rgba(182,23,30,0.4)'}">${patLoc.is_live?'👤':'🏠'}</div>`,
+      iconSize:[36,36], className:''
+    });
+    
+    mapMarkers.pat = L.marker([patLoc.lat, patLoc.lng], {icon:patIcon})
+      .addTo(map)
+      .bindPopup(`<b>Patient: ${MONITORED_USER}</b><br>${patLoc.is_live?'📍 Current Location':'🏠 Home Location'}<br><small>${patLoc.address}</small>`);
+
+    // Auto-center on patient if needed (only if active page)
+    if (currentPage === 'location') {
+       map.setView([patLoc.lat, patLoc.lng], patLoc.is_live ? 15 : 13);
+    }
+
+    // 2. Fetch ambulances
+    const rAmb = await fetch(`${API}/sos/ambulances`);
+    const ambs = await rAmb.json();
+    document.getElementById('loc-amb-count').textContent = ambs.length;
+    
+    Object.keys(mapMarkers).filter(k=>k.startsWith('amb_')).forEach(k=>{map.removeLayer(mapMarkers[k]);delete mapMarkers[k];});
+    
+    let hospitalName = '--';
+    ambs.forEach(amb => {
+      if (!amb.current_lat) return;
+      hospitalName = amb.hospital || hospitalName;
+      const icon = L.divIcon({
+        html:'<div style="background:#2563EB;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;border:3px solid white;box-shadow:0 3px 10px rgba(37,99,235,0.4)">🚑</div>',
+        iconSize:[36,36], className:''
+      });
+      mapMarkers[`amb_${amb.sos_id}`] = L.marker([amb.current_lat,amb.current_lng],{icon}).addTo(map).bindPopup(`<b>${amb.hospital}</b><br>ETA: ${amb.eta_minutes} min`);
+    });
+    document.getElementById('loc-hospital').textContent = hospitalName;
+
+    // 3. If live, setup polling
+    if (patLoc.is_live) {
+      if (window.locTimer) clearTimeout(window.locTimer);
+      window.locTimer = setTimeout(refreshLocation, 5000);
+    }
+  } catch(e) {
+    console.error('Refresh location error:', e);
+  }
+}
+
+// ════════════════════════════════
+// Nominee Settings
+// ════════════════════════════════
+let nominees = [
+  { name:'Rahul Sharma', phone:'+91-9876543210', email:'rahul@email.com', relation:'Son', primary:true, bg:'#2563eb' },
+  { name:'Priya Sharma', phone:'+91-9876543211', email:'priya@email.com', relation:'Daughter', primary:false, bg:'#ec4899' },
+];
+
+function renderNominees() {
+  const el = document.getElementById('nominees-list');
+  el.innerHTML = nominees.map((n, i) => `<div class="nominee-card">
+    <div class="nominee-avatar" style="background:${n.bg}">${n.name.charAt(0)}</div>
+    <div class="nominee-info">
+      <div class="nominee-name">${n.name} ${n.primary?'<span class="badge teal" style="font-size:10px;padding:2px 8px;margin-left:6px">Primary Nominee</span>':''}</div>
+      <div class="nominee-detail">${n.relation} · ${n.phone} · ${n.email}</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      ${!n.primary ? `<button onclick="transferPrimary(${i})" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border-color);background:#fff;color:var(--accent-teal);font-size:11px;font-weight:700;cursor:pointer">Make Primary</button>` : ''}
+      <button onclick="removeNominee(${i})" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border-color);background:#fff;color:var(--accent-red);font-size:11px;font-weight:700;cursor:pointer">Remove</button>
+    </div>
+  </div>`).join('');
+}
+
+function transferPrimary(idx) {
+  if (confirm(`Transfer Primary Nominee status to ${nominees[idx].name}?`)) {
+    nominees.forEach(n => n.primary = false);
+    nominees[idx].primary = true;
+    renderNominees();
+    alert(`✅ ${nominees[idx].name} is now the Primary Nominee`);
+  }
+}
+
+function removeNominee(idx) {
+  if (nominees[idx].primary) { alert('Cannot remove the Primary Nominee. Transfer the role first.'); return; }
+  if (confirm(`Remove ${nominees[idx].name} as a nominee?`)) {
+    nominees.splice(idx, 1);
+    renderNominees();
+  }
+}
+
+function changePatient() {
+  const newId = document.getElementById('patient-uid-input').value.trim();
+  if (!newId) { alert('Please enter a Patient User ID'); return; }
+  MONITORED_USER = newId;
+  document.getElementById('vitals-user').textContent = newId;
+  renderFamilyCircle();
+  alert(`✅ Now monitoring patient: ${newId}`);
+}
+
+// ════════════════════════════════
+// Modal
+// ════════════════════════════════
+let currentModal = null;
+function openModal(type) {
+  currentModal = type;
+  const overlay = document.getElementById('modal-overlay');
+  const body = document.getElementById('modal-body');
+  if (type === 'add-nominee') {
+    document.getElementById('modal-title').textContent = 'Add New Nominee';
+    document.getElementById('modal-subtitle').textContent = 'Add a family member as an emergency nominee';
+    body.innerHTML = `
+      <div class="modal-section"><label>Full Name</label><input class="modal-input" id="m-name" placeholder="Enter full name"/></div>
+      <div class="modal-section"><label>Phone Number</label><input class="modal-input" id="m-phone" placeholder="+91-..."/></div>
+      <div class="modal-section"><label>Email</label><input class="modal-input" id="m-email" placeholder="email@example.com"/></div>
+      <div class="modal-section"><label>Relation</label><input class="modal-input" id="m-relation" placeholder="e.g., Son, Daughter, Spouse"/></div>`;
+  }
+  overlay.classList.add('open');
+}
+function closeModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('modal-overlay').classList.remove('open');
+  currentModal = null;
+}
+function submitModal() {
+  if (currentModal === 'add-nominee') {
+    const name = document.getElementById('m-name')?.value;
+    const phone = document.getElementById('m-phone')?.value;
+    const email = document.getElementById('m-email')?.value;
+    const relation = document.getElementById('m-relation')?.value;
+    if (!name || !phone) { alert('Please fill in Name and Phone'); return; }
+    const colors = ['#2563eb','#ec4899','#f59e0b','#8b5cf6','#0d9488','#ef4444'];
+    nominees.push({ name, phone, email:email||'', relation:relation||'Family', primary:false, bg:colors[nominees.length % colors.length] });
+    renderNominees();
+    alert(`✅ ${name} added as nominee`);
+  }
+  closeModal();
+}
+
+// ════════════════════════════════
+// WebSocket
+// ════════════════════════════════
+function connectWS() {
+  try {
+    const ws = new WebSocket('ws://localhost:8000/hospital/ws');
+    ws.onopen = () => {
+      document.getElementById('conn-label').textContent = 'Live';
+    };
+    ws.onmessage = () => {
+      if (currentPage === 'vitals') fetchLatestVitals();
+      if (currentPage === 'alerts') fetchAlerts();
+    };
+    ws.onclose = () => setTimeout(connectWS, 3000);
+  } catch(e) {
+    document.getElementById('conn-label').textContent = 'Polling';
+  }
+}
+
+// ════════════════════════════════
+// Patient Info
+// ════════════════════════════════
+function renderPatientInfo() {
+  document.getElementById('patient-info').innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+    <div style="background:#f8fafc;padding:14px;border-radius:12px"><div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Patient ID</div><div style="font-size:16px;font-weight:900">${MONITORED_USER}</div></div>
+    <div style="background:#f8fafc;padding:14px;border-radius:12px"><div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Blood Group</div><div style="font-size:16px;font-weight:900;color:var(--accent-red)">B+</div></div>
+    <div style="background:#f8fafc;padding:14px;border-radius:12px"><div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Age</div><div style="font-size:16px;font-weight:900">72</div></div>
+    <div style="background:#f8fafc;padding:14px;border-radius:12px"><div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Doctor</div><div style="font-size:13px;font-weight:700;color:var(--accent-teal)">Dr. Anand Rao</div></div>
+    <div style="background:#f8fafc;padding:14px;border-radius:12px"><div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Hospital</div><div style="font-size:13px;font-weight:700">Apollo HSR</div></div>
+    <div style="background:#f8fafc;padding:14px;border-radius:12px"><div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Medications</div><div style="font-size:13px;font-weight:700">Metformin, Amlodipine</div></div>
+  </div>`;
+}
+
+// ════════════════════════════════
+// Initialize
+// ════════════════════════════════
+renderFamilyCircle();
+renderNominees();
+renderPatientInfo();
+initMap();
+connectWS();
+fetchAlerts();
+setInterval(fetchAlerts, 10000);
+</script>
+</body>
+</html>

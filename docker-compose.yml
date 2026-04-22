@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - DB_NAME=vitalguard
+      - DEV_MODE=false
+    restart: always
+
+  # Simple Nginx server to serve the frontend portals
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./doctor_portal:/usr/share/nginx/html/doctor_portal:ro
+      - ./family_portal:/usr/share/nginx/html/family_portal:ro
+      - ./hospital_portal:/usr/share/nginx/html/hospital_portal:ro
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+    restart: always
