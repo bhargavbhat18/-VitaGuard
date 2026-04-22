@@ -1,5 +1,6 @@
 {
     "rewrites": [
+        { "source": "/api/(.*)", "destination": "/api/index.py" },
         { "source": "/hospital", "destination": "/hospital_portal/index.html" },
         { "source": "/doctor", "destination": "/doctor_portal/index.html" },
         { "source": "/family", "destination": "/family_portal/index.html" }
