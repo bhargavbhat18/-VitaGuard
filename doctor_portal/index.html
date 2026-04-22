@@ -485,7 +485,7 @@ body{background:var(--bg-primary);color:var(--text-primary);min-height:100vh;ove
 </div>
 
 <script>
-const API='http://localhost:8000';
+const API = window.location.origin + '/api';
 
 // Clock
 setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})},1000);
@@ -887,7 +887,8 @@ function submitModal(){
 
 // ═══ WEBSOCKET ═══
 function connectWS(){
-  try{const ws=new WebSocket('ws://localhost:8000/hospital/ws');
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  try{const ws=new WebSocket(`${protocol}//${window.location.host}/api/hospital/ws`);
     ws.onopen=()=>{document.getElementById('conn-lbl').textContent='Live';};
     ws.onmessage=()=>{if(curPage==='triage')fetchTriage();if(curPage==='clinical')loadClinical();};
     ws.onclose=()=>setTimeout(connectWS,3000);
@@ -900,7 +901,8 @@ const DOCTOR_ID = 'DOC_001';
 const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 function connectTeleWS() {
-  teleWS = new WebSocket(`ws://localhost:8000/ws/telehealth/${DOCTOR_ID}`);
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  teleWS = new WebSocket(`${protocol}//${window.location.host}/api/ws/telehealth/${DOCTOR_ID}`);
   teleWS.onmessage = async (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'chat') appendMsg(msg.from, msg.data.text, 'patient');

@@ -628,7 +628,7 @@ body { background:var(--bg-primary); color:var(--text-primary); min-height:100vh
 
 <!-- ═══ JavaScript ═══ -->
 <script>
-const API = 'http://localhost:8000';
+const API = window.location.origin + '/api';
 let MONITORED_USER = 'LKT01';
 let map, mapMarkers = {};
 
@@ -1056,7 +1056,8 @@ function submitModal() {
 // ════════════════════════════════
 function connectWS() {
   try {
-    const ws = new WebSocket('ws://localhost:8000/hospital/ws');
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}/api/hospital/ws`);
     ws.onopen = () => {
       document.getElementById('conn-label').textContent = 'Live';
     };

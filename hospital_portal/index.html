@@ -1541,7 +1541,7 @@
             <div class="setting-label">Backend API URL</div>
             <div class="setting-desc">The base URL for the VitalGuard API server</div>
           </div>
-          <input class="modal-input" id="api-url-input" type="text" value="http://localhost:8000" />
+          <input class="modal-input" id="api-url-input" type="text" value="/api" />
         </div>
       </div>
     </section>
@@ -1563,7 +1563,7 @@
   <!-- ─── JavaScript (ALL existing logic preserved) ─── -->
   <script>
     // ── API Endpoint ──
-    const API = 'http://localhost:8000';
+    const API = window.location.origin + '/api';
     let map, markers = {};
 
     // ── Map Initialization ──
@@ -1768,7 +1768,8 @@
 
     function connectWS() {
       try {
-        const ws = new WebSocket('ws://localhost:8000/hospital/ws');
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/api/hospital/ws`);
         ws.onopen = () => {
           document.getElementById('cl').textContent = 'Live';
           document.getElementById('cb').style.background = 'rgba(34, 197, 94, 0.1)';
