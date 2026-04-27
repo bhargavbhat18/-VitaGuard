@@ -4,7 +4,7 @@ import 'dart:html' as html;
 class NotificationService {
   static bool _granted = false;
 
-  Future<void> initialize() async {
+  static Future<void> initialize() async {
     try {
       final permission = await html.Notification.requestPermission();
       _granted = permission == 'granted';

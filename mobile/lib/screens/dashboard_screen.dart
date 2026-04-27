@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vitalguard/models/vitals_model.dart';
 import 'package:vitalguard/providers/vitals_provider.dart';
@@ -31,7 +33,7 @@ class _DashState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    NotificationService().initialize();
+    NotificationService.initialize();
     _connectTelehealth();
   }
 
@@ -44,7 +46,7 @@ class _DashState extends ConsumerState<DashboardScreen> {
       if (data['type'] == 'signal' && data['data']['sdp'] != null && data['data']['sdp']['type'] == 'offer') {
         _showIncomingCall(data['from'], data['data']['sdp']);
       } else if (data['type'] == 'chat') {
-        NotificationService().showNotification('Doctor Message', data['data']['text']);
+        NotificationService.showAlert('Doctor Message', data['data']['text']);
       }
     });
   }
